@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
-import '../../../data/services/mock_auth_service.dart';
+import '../../../data/services/auth_service.dart';
 
 /// 🔑 ÉCRAN MOT DE PASSE OUBLIÉ
 /// Permet à l'utilisateur de réinitialiser son mot de passe
@@ -16,7 +16,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _authService = MockAuthService();
+  final _authService = AuthService();
   bool _isLoading = false;
   bool _emailSent = false;
   String? _errorMessage;

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
-import '../../../data/services/mock_auth_service.dart';
+import '../../../data/services/auth_service.dart';
 
 /// 🔐 ÉCRAN DE CONNEXION
 /// Permet à l'utilisateur de se connecter avec email/password ou Google
@@ -17,7 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = MockAuthService();
+  final _authService = AuthService();
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   String? _errorMessage;
@@ -262,10 +262,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: _handleGoogleSignIn,
-                    icon: Image.network(
-                      'https://www.google.com/favicon.ico',
-                      width: 20,
-                      height: 20,
+                    icon: Icon(
+                      Icons.g_mobiledata_rounded,
+                      size: 28,
+                      color: Colors.red,
                     ),
                     label: const Text('Se connecter avec Google'),
                     style: OutlinedButton.styleFrom(
@@ -309,11 +309,46 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleGoogleSignIn() async {
-    // TODO: Implémenter Google Sign In
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Connexion Google en cours de développement...'),
-      ),
-    );
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    
+    try {
+      // Connexion avec Google via AuthService
+      final user = await _authService.signInWithGoogle();
+      
+      if (!mounted) return;
+      
+      if (user != null) {
+        // Connexion réussie
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ Bienvenue ${user.fullName}!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        
+        // Navigation vers l'écran d'accueil
+        Navigator.pushReplacementNamed(context, AppRoutes.home);
+      } else {
+        // L'utilisateur a annulé la connexion
+        setState(() => _errorMessage = 'Connexion Google annulée');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = e.toString());
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la connexion Google: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 }

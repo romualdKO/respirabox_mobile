@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-// import 'package:firebase_core/firebase_core.dart';
-// import 'core/config/firebase_config.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/config/firebase_config.dart';
 import 'core/config/theme_config.dart';
 import 'routes/app_routes.dart';
 
@@ -11,10 +12,10 @@ void main() async {
   // ✅ Initialisation des services Flutter
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 🔥 Initialisation de Firebase - Désactivé temporairement pour dev frontend
-  // await Firebase.initializeApp(
-  //   options: FirebaseConfig.firebaseOptions,
-  // );
+  // 🔥 Initialisation de Firebase
+  await Firebase.initializeApp(
+    options: FirebaseConfig.firebaseOptions,
+  );
   
   // 📱 Configuration de l'orientation (portrait uniquement)
   await SystemChrome.setPreferredOrientations([
@@ -30,8 +31,12 @@ void main() async {
     ),
   );
   
-  // 🚀 Lancement de l'application
-  runApp(const RespiraBoxApp());
+  // 🚀 Lancement de l'application avec Riverpod
+  runApp(
+    const ProviderScope(
+      child: RespiraBoxApp(),
+    ),
+  );
 }
 
 /// 🏠 APPLICATION PRINCIPALE

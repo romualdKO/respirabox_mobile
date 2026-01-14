@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_model.dart';
 
 /// 🔐 SERVICE D'AUTHENTIFICATION FIREBASE
@@ -7,6 +8,9 @@ import '../models/user_model.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
 
   /// Utilisateur actuel connecté
   User? get currentUser => _auth.currentUser;
@@ -110,9 +114,80 @@ class AuthService {
   /// 🚪 DÉCONNEXION
   Future<void> signOut() async {
     try {
+      await _googleSignIn.signOut();
       await _auth.signOut();
     } catch (e) {
       throw 'Erreur lors de la déconnexion: $e';
+    }
+  }
+
+  /// 🔵 CONNEXION AVEC GOOGLE
+  Future<UserModel?> signInWithGoogle() async {
+    try {
+      // 1. Déclencher le flux d'authentification Google
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      
+      if (googleUser == null) {
+        // L'utilisateur a annulé la connexion
+        return null;
+      }
+
+      // 2. Obtenir les détails d'authentification
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // 3. Créer les credentials Firebase
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // 4. Se connecter à Firebase avec les credentials Google
+      final UserCredential userCredential = 
+          await _auth.signInWithCredential(credential);
+
+      if (userCredential.user != null) {
+        final firebaseUser = userCredential.user!;
+        
+        // 5. Vérifier si l'utilisateur existe déjà dans Firestore
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(firebaseUser.uid)
+            .get();
+
+        if (userDoc.exists) {
+          // Utilisateur existant, récupérer ses données
+          return UserModel.fromFirestore(userDoc);
+        } else {
+          // Nouvel utilisateur, créer son profil
+          final nameParts = (googleUser.displayName ?? '').split(' ');
+          final newUser = UserModel(
+            id: firebaseUser.uid,
+            firstName: nameParts.isNotEmpty ? nameParts[0] : 'Utilisateur',
+            lastName: nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
+            email: firebaseUser.email ?? googleUser.email,
+            phoneNumber: firebaseUser.phoneNumber,
+            gender: 'other',
+            profileImageUrl: googleUser.photoUrl,
+            role: UserRole.patient,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            isActive: true,
+          );
+
+          // Sauvegarder dans Firestore
+          await _firestore
+              .collection('users')
+              .doc(newUser.id)
+              .set(newUser.toFirestore());
+
+          return newUser;
+        }
+      }
+      return null;
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    } catch (e) {
+      throw 'Erreur lors de la connexion Google: $e';
     }
   }
 

@@ -1,12 +1,22 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 /// 🔥 CONFIGURATION FIREBASE RESPIRABOX
 /// Utilise les fichiers google-services.json (Android) et GoogleService-Info.plist (iOS)
 class FirebaseConfig {
-  /// Retourne les options Firebase selon la plateforme (iOS ou Android)
+  /// Retourne les options Firebase selon la plateforme (Web, iOS ou Android)
   static FirebaseOptions get firebaseOptions {
-    if (Platform.isIOS) {
+    if (kIsWeb) {
+      // 🌐 Configuration Web
+      return const FirebaseOptions(
+        apiKey: 'AIzaSyCH0-5uoEifeGZLRlNYsMwd29FmwFFttm0',
+        appId: '1:674993570782:web:5cc6186f91dad41a3f134f',
+        messagingSenderId: '674993570782',
+        projectId: 'respirabox-production',
+        storageBucket: 'respirabox-production.firebasestorage.app',
+        authDomain: 'respirabox-production.firebaseapp.com',
+      );
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       // 🍎 Configuration iOS (GoogleService-Info.plist)
       return const FirebaseOptions(
         apiKey: 'AIzaSyAeh056bhrg7TXC-cep8SfJ-GMXTAcU15E',

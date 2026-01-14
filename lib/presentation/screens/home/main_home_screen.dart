@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
-import '../../../data/services/mock_auth_service.dart';
+import '../../../core/providers/app_providers.dart';
+import '../../../data/services/auth_service.dart';
 import '../../../data/models/user_model.dart';
 import '../../../routes/app_routes.dart';
 import '../history/history_screen.dart';
@@ -9,51 +11,36 @@ import '../profile/profile_screen.dart';
 import '../profile/profile_screen.dart';
 
 /// 🏠 ÉCRAN D'ACCUEIL PRINCIPAL AVEC BOTTOM NAVIGATION
-class MainHomeScreen extends StatefulWidget {
+class MainHomeScreen extends ConsumerStatefulWidget {
   const MainHomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<MainHomeScreen> createState() => _MainHomeScreenState();
+  ConsumerState<MainHomeScreen> createState() => _MainHomeScreenState();
 }
 
-class _MainHomeScreenState extends State<MainHomeScreen> {
-  final _authService = MockAuthService();
+class _MainHomeScreenState extends ConsumerState<MainHomeScreen> {
   int _currentIndex = 0;
-  UserModel? _currentUser;
-  bool _isLoading = true;
 
-  final List<Widget> _pages = [
-    const DashboardPage(),
+  List<Widget> get _pages => [
+    DashboardPage(onTabChange: (index) => setState(() => _currentIndex = index)),
     const HistoryScreen(),
     const ProfileScreen(),
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _loadUserData();
-  }
-
-  Future<void> _loadUserData() async {
-    setState(() => _isLoading = true);
-    try {
-      final user = await _authService.getCurrentUserData();
-      setState(() {
-        _currentUser = user;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // Écouter le provider utilisateur
+    final userAsync = ref.watch(currentUserProvider);
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _pages[_currentIndex],
+      body: userAsync.when(
+        data: (user) => _pages[_currentIndex],
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stack) => Center(
+          child: Text('Erreur: $error'),
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
@@ -83,19 +70,33 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
 }
 
 /// 📊 PAGE DASHBOARD (ONGLET ACCUEIL)
-class DashboardPage extends StatelessWidget {
-  const DashboardPage({Key? key}) : super(key: key);
+class DashboardPage extends ConsumerStatefulWidget {
+  final Function(int) onTabChange;
+  
+  const DashboardPage({Key? key, required this.onTabChange}) : super(key: key);
 
   @override
+  ConsumerState<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends ConsumerState<DashboardPage> {
+  @override
   Widget build(BuildContext context) {
+    // Récupérer l'utilisateur depuis le provider
+    final userAsync = ref.watch(currentUserProvider);
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children:  [
-            // En-tête
-            _buildHeader(context),
+          children: [
+            // En-tête avec données utilisateur
+            userAsync.when(
+              data: (user) => _buildHeader(context, user),
+              loading: () => const CircularProgressIndicator(),
+              error: (_, __) => _buildHeader(context, null),
+            ),
             const SizedBox(height: 30),
 
             // Carte de bienvenue
@@ -120,7 +121,7 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, UserModel? user) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -129,16 +130,23 @@ class DashboardPage extends StatelessWidget {
           children: [
             Text('Bonjour 👋', style: AppTextStyles.bodyText),
             const SizedBox(height: 4),
-            Text('Jean Dupont', style: AppTextStyles.h2),
+            Text(
+              user?.fullName ?? 'Utilisateur',
+              style: AppTextStyles.h2,
+            ),
           ],
         ),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+        InkWell(
+          onTap: () => Navigator.pushNamed(context, AppRoutes.notifications),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.notifications_outlined, color: AppColors.primary),
           ),
-          child: const Icon(Icons.notifications_outlined, color: AppColors.primary),
         ),
       ],
     );
@@ -288,9 +296,7 @@ class DashboardPage extends StatelessWidget {
           children: [
             Text('Derniers tests', style: AppTextStyles.h3),
             TextButton(
-              onPressed: () {
-                // TODO: Voir tous les tests
-              },
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.home),
               child: const Text('Voir tout'),
             ),
           ],

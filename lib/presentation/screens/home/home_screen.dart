@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
-import '../../../data/services/mock_auth_service.dart';
+import '../../../data/services/auth_service.dart';
 import '../../../data/models/user_model.dart';
 
 /// 🏠 ÉCRAN D'ACCUEIL PRINCIPAL (TEMPORAIRE)
@@ -15,7 +15,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _authService = MockAuthService();
+  final _authService = AuthService();
   UserModel? _currentUser;
   bool _isLoading = true;
 

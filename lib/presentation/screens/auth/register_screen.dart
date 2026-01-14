@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
-import '../../../data/services/mock_auth_service.dart';
+import '../../../data/services/auth_service.dart';
 
 /// 📝 ÉCRAN D'INSCRIPTION
 /// Permet à un nouvel utilisateur de créer un compte
@@ -21,7 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _authService = MockAuthService();
+  final _authService = AuthService();
   
   String _selectedGender = 'Homme';
   DateTime? _selectedDate;

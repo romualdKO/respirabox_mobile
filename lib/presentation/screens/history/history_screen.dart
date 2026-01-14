@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 
@@ -602,10 +603,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context);
-                        // TODO: Export PDF
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Fonctionnalité à venir')),
-                        );
+                        _shareTestResult(test);
                       },
                       icon: const Icon(Icons.picture_as_pdf),
                       label: const Text('Exporter en PDF'),
@@ -649,6 +647,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  void _shareTestResult(Map<String, dynamic> test) {
+    final message = '''
+🫁 RespiraBox - Résultats du test
+
+📅 Date: ${test['date']} ${test['time']}
+
+📊 Score de risque: ${test['score']}/100 (${test['risk']})
+
+📈 Mesures:
+• SpO2: ${test['spo2']}
+• Fréquence cardiaque: ${test['heartRate']}
+• Température: ${test['temperature']}
+
+---
+Application RespiraBox
+Dépistage des maladies respiratoires
+    ''';
+
+    Share.share(
+      message,
+      subject: 'Résultats de mon test RespiraBox',
     );
   }
 }

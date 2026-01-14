@@ -5,13 +5,14 @@ import '../presentation/screens/welcome/welcome_screen.dart';
 import '../presentation/screens/auth/login_screen.dart';
 import '../presentation/screens/auth/register_screen.dart';
 import '../presentation/screens/auth/forgot_password_screen.dart';
-import '../presentation/screens/home/home_screen.dart';
 import '../presentation/screens/home/main_home_screen.dart';
 import '../presentation/screens/device/device_scan_screen.dart';
 import '../presentation/screens/test/test_preparation_screen.dart';
 import '../presentation/screens/test/test_execution_screen.dart';
 import '../presentation/screens/test/test_results_screen.dart';
 import '../presentation/screens/chatbot/chatbot_screen.dart';
+import '../presentation/screens/notifications/notifications_screen.dart';
+import '../presentation/screens/support/support_screens.dart';
 
 /// 🧭 GESTIONNAIRE DE ROUTES DE L'APPLICATION RESPIRABOX
 /// Définit toutes les routes de navigation
@@ -48,6 +49,12 @@ class AppRoutes {
   
   // 💬 CHATBOT IA
   static const String chatbot = '/chatbot';
+  
+  // 📚 SUPPORT
+  static const String help = '/help';
+  static const String privacy = '/privacy';
+  static const String terms = '/terms';
+  static const String about = '/about';
   
   // 🌍 DONNÉES ENVIRONNEMENTALES
   static const String environmental = '/environmental';
@@ -90,6 +97,21 @@ class AppRoutes {
       
       case chatbot:
         return MaterialPageRoute(builder: (_) => const ChatbotScreen());
+      
+      case notifications:
+        return MaterialPageRoute(builder: (_) => const NotificationsScreen());
+      
+      case help:
+        return MaterialPageRoute(builder: (_) => const HelpScreen());
+      
+      case privacy:
+        return MaterialPageRoute(builder: (_) => const PrivacyScreen());
+      
+      case terms:
+        return MaterialPageRoute(builder: (_) => const TermsScreen());
+      
+      case about:
+        return MaterialPageRoute(builder: (_) => const AboutScreen());
       
       // TODO: Ajouter les autres routes au fur et à mesure du développement
       

@@ -1,34 +1,36 @@
 import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 
-/// 📦 SERVICE FIREBASE STORAGE
-/// Gère l'upload et le téléchargement de fichiers (audio, images, PDF)
+/// 📦 SERVICE DE STOCKAGE LOCAL
+/// Gère la sauvegarde locale de fichiers (audio, images, PDF)
+/// Alternative à Firebase Storage pour le mode Spark (gratuit)
 class StorageService {
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  
+  /// Obtenir le répertoire de stockage de l'app
+  Future<Directory> get _appDirectory async {
+    return await getApplicationDocumentsDirectory();
+  }
 
-  /// 🎙️ UPLOADER UN FICHIER AUDIO DE TEST
+  /// 🎙️ SAUVEGARDER UN FICHIER AUDIO DE TEST (LOCAL)
   Future<String> uploadAudioFile({
     required String userId,
     required File audioFile,
     required String testId,
   }) async {
     try {
+      final appDir = await _appDirectory;
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(audioFile.path)}';
-      final ref = _storage.ref().child('audio_tests/$userId/$testId/$fileName');
-
-      // Upload avec métadonnées
-      final uploadTask = ref.putFile(
-        audioFile,
-        SettableMetadata(
-          contentType: 'audio/wav',
-          customMetadata: {
-            'userId': userId,
-            'testId': testId,
-            'uploadDate': DateTime.now().toIso8601String(),
-          },
-        ),
-      );
+      final testDir = Directory('${appDir.path}/audio_tests/$userId/$testId');
+      
+      // Créer le dossier si nécessaire
+      if (!await testDir.exists()) {
+        await testDir.create(recursive: true);
+      }
+      
+      // Copier le fichier audio
+      final savedFile = File('${testDir.path}/$fileName');
+      await audioFile.copy(savedFile.path);
 
       // Attendre la fin de l'upload
       final snapshot = await uploadTask;

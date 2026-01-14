@@ -47,6 +47,8 @@ app.*.map.json
 # Firebase configuration files (sensitive)
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+imgdoc/*.json
+imgdoc/**/*.json
 
 # Local properties
 android/local.properties

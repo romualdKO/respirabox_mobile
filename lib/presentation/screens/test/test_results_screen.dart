@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
@@ -37,12 +38,7 @@ class TestResultsScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.share, color: AppColors.textDark),
-            onPressed: () {
-              // TODO: Partager les résultats
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Fonctionnalité à venir')),
-              );
-            },
+            onPressed: () => _shareResults(context, riskLevel, riskScore, spo2, heartRate, temperature),
           ),
         ],
       ),
@@ -436,6 +432,53 @@ class TestResultsScreen extends StatelessWidget {
         {'icon': Icons.warning_amber_outlined, 'text': 'Évitez les efforts physiques intenses'},
         {'icon': Icons.local_hospital_outlined, 'text': 'Rendez-vous aux urgences si difficultés respiratoires'},
       ];
+    }
+  }
+
+  // Partager les résultats
+  static void _shareResults(
+    BuildContext context,
+    String riskLevel,
+    int riskScore,
+    int spo2,
+    int heartRate,
+    double temperature,
+  ) {
+    final now = DateTime.now();
+    final date = '${now.day}/${now.month}/${now.year} à ${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+    
+    final message = '''
+🫁 RespiraBox - Résultats du test
+
+📅 Date: $date
+
+📊 Score de risque: $riskScore/100 ($riskLevel)
+
+📈 Mesures:
+• SpO2: $spo2%
+• Fréquence cardiaque: $heartRate bpm
+• Température: ${temperature.toStringAsFixed(1)}°C
+
+${_getShareInterpretation(riskLevel)}
+
+---
+Application RespiraBox
+Dépistage des maladies respiratoires
+    ''';
+
+    Share.share(
+      message,
+      subject: 'Résultats de mon test RespiraBox',
+    );
+  }
+
+  static String _getShareInterpretation(String riskLevel) {
+    if (riskLevel.toLowerCase() == 'faible') {
+      return '✅ Vos paramètres respiratoires sont dans les normes.';
+    } else if (riskLevel.toLowerCase() == 'moyen') {
+      return '⚠️ Certains paramètres nécessitent une surveillance. Consultez un professionnel de santé.';
+    } else {
+      return '🚨 Score de risque élevé. Consultez rapidement un professionnel de santé.';
     }
   }
 }

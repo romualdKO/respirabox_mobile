@@ -85,6 +85,51 @@ class UserModel {
     };
   }
 
+  /// Conversion depuis Firestore
+  factory UserModel.fromFirestore(dynamic doc) {
+    final Map<String, dynamic> data = doc.data() ?? {};
+    return UserModel(
+      id: doc.id,
+      firstName: data['firstName'] ?? '',
+      lastName: data['lastName'] ?? '',
+      email: data['email'] ?? '',
+      phoneNumber: data['phoneNumber'],
+      dateOfBirth: data['dateOfBirth'] != null
+          ? DateTime.parse(data['dateOfBirth'])
+          : null,
+      gender: data['gender'] ?? 'other',
+      profileImageUrl: data['profileImageUrl'],
+      role: UserRole.values.firstWhere(
+        (e) => e.toString() == 'UserRole.${data['role']}',
+        orElse: () => UserRole.patient,
+      ),
+      createdAt: data['createdAt'] != null
+          ? DateTime.parse(data['createdAt'])
+          : DateTime.now(),
+      updatedAt: data['updatedAt'] != null
+          ? DateTime.parse(data['updatedAt'])
+          : DateTime.now(),
+      isActive: data['isActive'] ?? true,
+    );
+  }
+
+  /// Conversion vers Firestore (pour .set() et .update())
+  Map<String, dynamic> toFirestore() {
+    return {
+      'firstName': firstName,
+      'lastName': lastName,
+      'email': email,
+      'phoneNumber': phoneNumber,
+      'dateOfBirth': dateOfBirth?.toIso8601String(),
+      'gender': gender,
+      'profileImageUrl': profileImageUrl,
+      'role': role.toString().split('.').last,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'isActive': isActive,
+    };
+  }
+
   /// Copie avec modification
   UserModel copyWith({
     String? id,
