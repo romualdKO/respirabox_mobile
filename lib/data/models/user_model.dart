@@ -13,6 +13,15 @@ class UserModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isActive;
+  
+  // 🏥 Informations médicales
+  final int? height; // Taille en cm
+  final int? weight; // Poids en kg
+  final String? bloodType; // Groupe sanguin (A+, A-, B+, B-, AB+, AB-, O+, O-)
+  final String? medicalConditions; // Conditions médicales
+  final String? allergies; // Allergies
+  final String? medications; // Médicaments actuels
+  final String? emergencyContact; // Contact d'urgence
 
   UserModel({
     required this.id,
@@ -27,6 +36,13 @@ class UserModel {
     required this.createdAt,
     required this.updatedAt,
     this.isActive = true,
+    this.height,
+    this.weight,
+    this.bloodType,
+    this.medicalConditions,
+    this.allergies,
+    this.medications,
+    this.emergencyContact,
   });
 
   /// Nom complet de l'utilisateur
@@ -64,6 +80,13 @@ class UserModel {
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: DateTime.parse(json['updatedAt']),
       isActive: json['isActive'] ?? true,
+      height: json['height'],
+      weight: json['weight'],
+      bloodType: json['bloodType'],
+      medicalConditions: json['medicalConditions'],
+      allergies: json['allergies'],
+      medications: json['medications'],
+      emergencyContact: json['emergencyContact'],
     );
   }
 
@@ -82,6 +105,13 @@ class UserModel {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isActive': isActive,
+      'height': height,
+      'weight': weight,
+      'bloodType': bloodType,
+      'medicalConditions': medicalConditions,
+      'allergies': allergies,
+      'medications': medications,
+      'emergencyContact': emergencyContact,
     };
   }
 
@@ -110,6 +140,13 @@ class UserModel {
           ? DateTime.parse(data['updatedAt'])
           : DateTime.now(),
       isActive: data['isActive'] ?? true,
+      height: data['height'],
+      weight: data['weight'],
+      bloodType: data['bloodType'],
+      medicalConditions: data['medicalConditions'],
+      allergies: data['allergies'],
+      medications: data['medications'],
+      emergencyContact: data['emergencyContact'],
     );
   }
 
@@ -127,6 +164,13 @@ class UserModel {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'isActive': isActive,
+      'height': height,
+      'weight': weight,
+      'bloodType': bloodType,
+      'medicalConditions': medicalConditions,
+      'allergies': allergies,
+      'medications': medications,
+      'emergencyContact': emergencyContact,
     };
   }
 
@@ -144,6 +188,13 @@ class UserModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? isActive,
+    int? height,
+    int? weight,
+    String? bloodType,
+    String? medicalConditions,
+    String? allergies,
+    String? medications,
+    String? emergencyContact,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -158,6 +209,13 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isActive: isActive ?? this.isActive,
+      height: height ?? this.height,
+      weight: weight ?? this.weight,
+      bloodType: bloodType ?? this.bloodType,
+      medicalConditions: medicalConditions ?? this.medicalConditions,
+      allergies: allergies ?? this.allergies,
+      medications: medications ?? this.medications,
+      emergencyContact: emergencyContact ?? this.emergencyContact,
     );
   }
 }

@@ -41,7 +41,7 @@ dependencies:
   # 🌐 HTTP & API (Gemini AI)
   http: ^1.1.2
   dio: ^5.4.0
-  google_generative_ai: ^0.2.0
+  google_generative_ai: ^0.4.0
   
   # 📊 Charts & Graphiques
   fl_chart: ^0.65.0
@@ -55,10 +55,17 @@ dependencies:
   image_picker: ^1.0.7
     # 📤 Share
   share_plus: ^7.2.1
-    # �🔐 Permissions
+  
+  # 🔐 Permissions
   permission_handler: ^11.1.0
   
-  # 🛠️ Utilitaires
+  # 🎤 Audio Recording
+  record: ^5.0.4
+  
+  # � Storage
+  firebase_storage: ^12.4.10
+  
+  # �🛠️ Utilitaires
   intl: ^0.20.2
   shared_preferences: ^2.2.2
   path_provider: ^2.1.1

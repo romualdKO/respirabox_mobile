@@ -238,6 +238,40 @@ class AuthService {
     }
   }
 
+  /// 🔒 CHANGER LE MOT DE PASSE
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null || user.email == null) {
+        throw 'Aucun utilisateur connecté';
+      }
+
+      // Ré-authentifier l'utilisateur avec le mot de passe actuel
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+
+      // Changer le mot de passe
+      await user.updatePassword(newPassword);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password') {
+        throw 'Le mot de passe actuel est incorrect';
+      } else if (e.code == 'weak-password') {
+        throw 'Le nouveau mot de passe est trop faible';
+      } else {
+        throw _handleAuthException(e);
+      }
+    } catch (e) {
+      throw 'Erreur lors du changement de mot de passe: $e';
+    }
+  }
+
   /// ⚠️ GESTION DES ERREURS D'AUTHENTIFICATION
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {

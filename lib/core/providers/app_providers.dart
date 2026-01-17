@@ -3,6 +3,7 @@ import '../../data/services/auth_service.dart';
 import '../../data/services/test_service.dart';
 import '../../data/services/notification_service.dart';
 import '../../data/services/respirabox_device_service.dart';
+import '../../data/services/gemini_ai_service.dart';
 import '../../data/models/user_model.dart';
 import '../../data/models/test_result_model.dart';
 import '../../data/models/notification_model.dart';
@@ -14,6 +15,11 @@ import '../../data/models/notification_model.dart';
 /// Instance du service d'authentification
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
+});
+
+/// 🤖 Instance du service Gemini AI
+final geminiAIServiceProvider = Provider<GeminiAIService>((ref) {
+  return GeminiAIService();
 });
 
 /// Utilisateur actuel (stream)

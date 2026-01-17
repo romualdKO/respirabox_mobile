@@ -28,6 +28,11 @@ class AppTextStyles {
   static const TextStyle h1 = headline1;
   static const TextStyle h2 = headline2;
   static const TextStyle h3 = headline3;
+  static const TextStyle h4 = TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textPrimary,
+  );
   static const TextStyle bodyText = bodyLarge;
   
   // 📝 CORPS DE TEXTE (Body)

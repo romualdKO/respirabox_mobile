@@ -110,11 +110,19 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             const SizedBox(height: 30),
 
             // Derniers tests
-            _buildLastTests(context),
+            userAsync.when(
+              data: (user) => _buildLastTests(context, user?.id ?? ''),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
             const SizedBox(height: 30),
 
             // Statistiques
-            _buildStatistics(context),
+            userAsync.when(
+              data: (user) => _buildStatistics(context, user?.id ?? ''),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
           ],
         ),
       ),
@@ -287,7 +295,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  Widget _buildLastTests(BuildContext context) {
+  Widget _buildLastTests(BuildContext context, String userId) {
+    final testsAsync = ref.watch(recentTestsProvider(userId));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -296,31 +306,104 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           children: [
             Text('Derniers tests', style: AppTextStyles.h3),
             TextButton(
-              onPressed: () => Navigator.pushNamed(context, AppRoutes.home),
+              onPressed: () => widget.onTabChange(1),
               child: const Text('Voir tout'),
             ),
           ],
         ),
         const SizedBox(height: 15),
-        _buildTestCard(
-          date: '14 Déc 2025',
-          time: '14:30',
-          riskLevel: 'Faible',
-          spo2: 98,
-          heartRate: 75,
-          riskColor: AppColors.success,
-        ),
-        const SizedBox(height: 10),
-        _buildTestCard(
-          date: '10 Déc 2025',
-          time: '09:15',
-          riskLevel: 'Moyen',
-          spo2: 94,
-          heartRate: 82,
-          riskColor: AppColors.warning,
+        testsAsync.when(
+          data: (tests) {
+            if (tests.isEmpty) {
+              return _buildEmptyTestsCard();
+            }
+            return Column(
+              children: tests.take(2).map((test) {
+                final riskColor = test.riskLevel == 'low' 
+                    ? AppColors.success 
+                    : test.riskLevel == 'moderate' 
+                        ? AppColors.warning 
+                        : AppColors.error;
+                final riskText = test.riskLevel == 'low'
+                    ? 'Faible'
+                    : test.riskLevel == 'moderate'
+                        ? 'Moyen'
+                        : 'Élevé';
+                
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _buildTestCard(
+                    date: '${test.testDate.day} ${_getMonthName(test.testDate.month)} ${test.testDate.year}',
+                    time: '${test.testDate.hour.toString().padLeft(2, '0')}:${test.testDate.minute.toString().padLeft(2, '0')}',
+                    riskLevel: riskText,
+                    spo2: (test.spo2 ?? 0).round(),
+                    heartRate: test.heartRate ?? 0,
+                    riskColor: riskColor,
+                  ),
+                );
+              }).toList(),
+            );
+          },
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (error, stack) => Center(
+            child: Text('Erreur: $error'),
+          ),
         ),
       ],
     );
+  }
+
+  Widget _buildEmptyTestsCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.assignment_outlined,
+            size: 60,
+            color: AppColors.textLight.withOpacity(0.5),
+          ),
+          const SizedBox(height: 15),
+          Text(
+            'Aucun test effectué',
+            style: AppTextStyles.h3,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Commencez par scanner votre RespiraBox pour effectuer votre premier test',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textLight,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+      'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'
+    ];
+    return months[month - 1];
   }
 
   Widget _buildTestCard({
@@ -397,32 +480,85 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  Widget _buildStatistics(BuildContext context) {
+  Widget _buildStatistics(BuildContext context, String userId) {
+    final testsAsync = ref.watch(recentTestsProvider(userId));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Statistiques', style: AppTextStyles.h3),
         const SizedBox(height: 15),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                title: 'Tests effectués',
-                value: '24',
-                icon: Icons.assignment_turned_in,
-                color: AppColors.primary,
+        testsAsync.when(
+          data: (tests) {
+            final totalTests = tests.length;
+            final avgSpo2 = tests.isEmpty
+                ? 0
+                : (tests.map((t) => t.spo2 ?? 0).reduce((a, b) => a + b) / tests.length).round();
+
+            return Row(
+              children: [
+                Expanded(
+                  child: _buildStatCard(
+                    title: 'Tests effectués',
+                    value: '$totalTests',
+                    icon: Icons.assignment_turned_in,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: _buildStatCard(
+                    title: 'SpO2 moyen',
+                    value: tests.isEmpty ? '--' : '$avgSpo2%',
+                    icon: Icons.water_drop,
+                    color: AppColors.info,
+                  ),
+                ),
+              ],
+            );
+          },
+          loading: () => Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  title: 'Tests effectués',
+                  value: '--',
+                  icon: Icons.assignment_turned_in,
+                  color: AppColors.primary,
+                ),
               ),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: _buildStatCard(
-                title: 'SpO2 moyen',
-                value: '96%',
-                icon: Icons.water_drop,
-                color: AppColors.info,
+              const SizedBox(width: 15),
+              Expanded(
+                child: _buildStatCard(
+                  title: 'SpO2 moyen',
+                  value: '--',
+                  icon: Icons.water_drop,
+                  color: AppColors.info,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          error: (_, __) => Row(
+            children: [
+              Expanded(
+                child: _buildStatCard(
+                  title: 'Tests effectués',
+                  value: '--',
+                  icon: Icons.assignment_turned_in,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: _buildStatCard(
+                  title: 'SpO2 moyen',
+                  value: '--',
+                  icon: Icons.water_drop,
+                  color: AppColors.info,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

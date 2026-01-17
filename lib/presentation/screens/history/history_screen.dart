@@ -1,90 +1,78 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/providers/app_providers.dart';
 
 /// 📜 ÉCRAN D'HISTORIQUE DES TESTS
 /// Affiche tous les tests effectués avec filtres et recherche
-class HistoryScreen extends StatefulWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({Key? key}) : super(key: key);
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   String _selectedFilter = 'Tous';
   final List<String> _filters = ['Tous', 'Faible', 'Moyen', 'Élevé'];
 
-  // Données simulées
-  final List<Map<String, dynamic>> _testHistory = [
-    {
-      'date': '16 Déc 2025',
-      'time': '14:30',
-      'spo2': 98,
-      'heartRate': 75,
-      'temperature': 36.8,
-      'riskLevel': 'Faible',
-      'riskScore': 92,
-    },
-    {
-      'date': '14 Déc 2025',
-      'time': '09:15',
-      'spo2': 94,
-      'heartRate': 82,
-      'temperature': 37.1,
-      'riskLevel': 'Moyen',
-      'riskScore': 65,
-    },
-    {
-      'date': '10 Déc 2025',
-      'time': '16:45',
-      'spo2': 97,
-      'heartRate': 72,
-      'temperature': 36.6,
-      'riskLevel': 'Faible',
-      'riskScore': 88,
-    },
-    {
-      'date': '08 Déc 2025',
-      'time': '11:20',
-      'spo2': 96,
-      'heartRate': 78,
-      'temperature': 36.9,
-      'riskLevel': 'Faible',
-      'riskScore': 90,
-    },
-    {
-      'date': '05 Déc 2025',
-      'time': '15:30',
-      'spo2': 92,
-      'heartRate': 88,
-      'temperature': 37.3,
-      'riskLevel': 'Moyen',
-      'riskScore': 58,
-    },
-    {
-      'date': '01 Déc 2025',
-      'time': '10:00',
-      'spo2': 98,
-      'heartRate': 70,
-      'temperature': 36.7,
-      'riskLevel': 'Faible',
-      'riskScore': 95,
-    },
-  ];
-
-  List<Map<String, dynamic>> get _filteredTests {
-    if (_selectedFilter == 'Tous') {
-      return _testHistory;
-    }
-    return _testHistory
-        .where((test) => test['riskLevel'] == _selectedFilter)
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Récupérer l'utilisateur courant
+    final userAsync = ref.watch(currentUserProvider);
+
+    return userAsync.when(
+      data: (user) {
+        if (user == null) {
+          return Scaffold(
+            backgroundColor: AppColors.backgroundLight,
+            body: const Center(child: Text('Utilisateur non connecté')),
+          );
+        }
+
+        // Charger les tests de l'utilisateur
+        final testsAsync = ref.watch(recentTestsProvider(user.id));
+
+        return testsAsync.when(
+          data: (allTests) {
+            // Filtrer les tests selon le filtre sélectionné
+            final filteredTests = _selectedFilter == 'Tous'
+                ? allTests
+                : allTests.where((test) {
+                    final riskText = test.riskLevel == 'low'
+                        ? 'Faible'
+                        : test.riskLevel == 'moderate'
+                            ? 'Moyen'
+                            : 'Élevé';
+                    return riskText == _selectedFilter;
+                  }).toList();
+
+            return _buildHistoryContent(filteredTests);
+          },
+          loading: () => Scaffold(
+            backgroundColor: AppColors.backgroundLight,
+            body: const Center(child: CircularProgressIndicator()),
+          ),
+          error: (error, stack) => Scaffold(
+            backgroundColor: AppColors.backgroundLight,
+            body: Center(child: Text('Erreur: $error')),
+          ),
+        );
+      },
+      loading: () => Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stack) => Scaffold(
+        backgroundColor: AppColors.backgroundLight,
+        body: Center(child: Text('Erreur: $error')),
+      ),
+    );
+  }
+
+  Widget _buildHistoryContent(List tests) {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: SafeArea(
@@ -102,7 +90,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       Text('Historique', style: AppTextStyles.h2),
                       const SizedBox(height: 4),
                       Text(
-                        '${_filteredTests.length} test${_filteredTests.length > 1 ? 's' : ''}',
+                        '${tests.length} test${tests.length > 1 ? 's' : ''}',
                         style: TextStyle(
                           fontSize: 14,
                           color: AppColors.textLight,
@@ -123,19 +111,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
             const SizedBox(height: 10),
 
             // Statistiques résumées
-            _buildStatsSummary(),
+            _buildStatsSummary(tests),
             const SizedBox(height: 20),
 
             // Liste des tests
             Expanded(
-              child: _filteredTests.isEmpty
+              child: tests.isEmpty
                   ? _buildEmptyState()
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _filteredTests.length,
+                      itemCount: tests.length,
                       itemBuilder: (context, index) {
-                        final test = _filteredTests[index];
-                        return _buildTestCard(test);
+                        final test = tests[index];
+                        return _buildTestCardFromModel(test);
                       },
                     ),
             ),
@@ -181,23 +169,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildStatsSummary() {
-    final avgSpo2 = (_testHistory.fold<int>(
-              0,
-              (sum, test) => sum + (test['spo2'] as int),
+  Widget _buildStatsSummary(List tests) {
+    if (tests.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final avgSpo2 = (tests.fold<double>(
+              0.0,
+              (sum, test) => sum + (test.spo2 ?? 0.0),
             ) /
-            _testHistory.length)
+            tests.length)
         .round();
 
-    final avgHeartRate = (_testHistory.fold<int>(
-              0,
-              (sum, test) => sum + (test['heartRate'] as int),
+    final avgHeartRate = (tests.fold<double>(
+              0.0,
+              (sum, test) => sum + ((test.heartRate ?? 0).toDouble()),
             ) /
-            _testHistory.length)
+            tests.length)
         .round();
 
     final lowRiskCount =
-        _testHistory.where((t) => t['riskLevel'] == 'Faible').length;
+        tests.where((t) => t.riskLevel == 'low').length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -395,6 +387,139 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildTestCardFromModel(dynamic test) {
+    final riskColor = test.riskLevel == 'low'
+        ? AppColors.success
+        : test.riskLevel == 'moderate'
+            ? AppColors.warning
+            : AppColors.error;
+
+    final riskText = test.riskLevel == 'low'
+        ? 'Faible'
+        : test.riskLevel == 'moderate'
+            ? 'Moyen'
+            : 'Élevé';
+
+    final date = test.testDate;
+    final dateStr = '${date.day} ${_getMonthName(date.month)} ${date.year}';
+    final timeStr = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () {
+          // Navigation vers les détails du test
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: riskColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.favorite, color: riskColor, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          dateStr,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          timeStr,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: riskColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      riskText,
+                      style: TextStyle(
+                        color: riskColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildMetric(
+                    icon: Icons.water_drop,
+                    label: 'SpO2',
+                    value: '${(test.spo2 ?? 0).round()}%',
+                  ),
+                  _buildMetric(
+                    icon: Icons.favorite,
+                    label: 'FC',
+                    value: '${test.heartRate ?? 0}',
+                  ),
+                  _buildMetric(
+                    icon: Icons.thermostat,
+                    label: 'Temp',
+                    value: '${test.temperature?.toStringAsFixed(1) ?? '--'}°C',
+                  ),
+                  _buildMetric(
+                    icon: Icons.score,
+                    label: 'Score',
+                    value: '${test.riskScore ?? 0}',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+      'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'
+    ];
+    return months[month - 1];
   }
 
   Widget _buildMetric({

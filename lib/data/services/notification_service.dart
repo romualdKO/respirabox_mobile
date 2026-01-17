@@ -258,4 +258,159 @@ class NotificationService {
 
     await createNotification(notification);
   }
+
+  /// 🧠 NOTIFICATIONS INTELLIGENTES BASÉES SUR L'ÉTAT DE SANTÉ
+  /// Analyse les résultats de tests et envoie des rappels personnalisés
+  Future<void> sendHealthBasedReminders(String userId) async {
+    try {
+      // Récupérer les derniers tests de l'utilisateur
+      final testsSnapshot = await _firestore
+          .collection('tests')
+          .where('userId', isEqualTo: userId)
+          .orderBy('testDate', descending: true)
+          .limit(5)
+          .get();
+
+      if (testsSnapshot.docs.isEmpty) {
+        // Aucun test, envoyer rappel pour faire un test
+        await sendReminderNotification(
+          userId,
+          '🫁 Il est temps de faire votre premier test respiratoire pour surveiller votre santé.',
+        );
+        return;
+      }
+
+      final tests = testsSnapshot.docs;
+      final lastTest = tests.first.data();
+      final lastTestDate = (lastTest['testDate'] as Timestamp).toDate();
+      final daysSinceLastTest = DateTime.now().difference(lastTestDate).inDays;
+
+      // Analyser le niveau de risque moyen
+      int highRiskCount = 0;
+      int moderateRiskCount = 0;
+      
+      for (var test in tests) {
+        final riskLevel = test.data()['riskLevel'] as String?;
+        if (riskLevel == 'high') highRiskCount++;
+        if (riskLevel == 'moderate') moderateRiskCount++;
+      }
+
+      // LOGIQUE INTELLIGENTE DES RAPPELS
+      
+      // 1. Risque élevé répété -> Alerte médicale urgente
+      if (highRiskCount >= 2) {
+        await sendAlertNotification(
+          userId,
+          '⚠️ URGENT : Vos derniers tests montrent un risque élevé. Consultez immédiatement un médecin.',
+        );
+        return;
+      }
+
+      // 2. Risque élevé récent -> Rappel test de contrôle
+      if (lastTest['riskLevel'] == 'high' && daysSinceLastTest >= 2) {
+        await sendReminderNotification(
+          userId,
+          '🏥 Test de contrôle recommandé : Votre dernier test montrait un risque élevé il y a $daysSinceLastTest jours.',
+        );
+        return;
+      }
+
+      // 3. Risque modéré répété -> Suivi régulier
+      if (moderateRiskCount >= 3) {
+        await sendReminderNotification(
+          userId,
+          '📊 Vos tests montrent un risque modéré persistant. Pensez à consulter votre médecin pour un suivi.',
+        );
+        return;
+      }
+
+      // 4. SpO2 bas détecté -> Alerte oxygénation
+      final spo2 = lastTest['spo2'] as num?;
+      if (spo2 != null && spo2 < 90) {
+        await sendAlertNotification(
+          userId,
+          '💨 Oxygénation basse détectée (${spo2.round()}%). Faites un nouveau test et consultez si les symptômes persistent.',
+        );
+        return;
+      }
+
+      // 5. Fréquence cardiaque anormale -> Alerte
+      final heartRate = lastTest['heartRate'] as num?;
+      if (heartRate != null && (heartRate > 120 || heartRate < 50)) {
+        await sendReminderNotification(
+          userId,
+          '❤️ Fréquence cardiaque anormale détectée (${heartRate} bpm). Surveillez votre état et consultez si nécessaire.',
+        );
+        return;
+      }
+
+      // 6. Pas de test depuis longtemps -> Rappel régulier
+      if (daysSinceLastTest >= 7 && lastTest['riskLevel'] == 'low') {
+        await sendReminderNotification(
+          userId,
+          '⏰ Cela fait $daysSinceLastTest jours depuis votre dernier test. Pensez à faire un contrôle régulier.',
+        );
+        return;
+      }
+
+      // 7. Amélioration constatée -> Encouragement
+      if (tests.length >= 2) {
+        final previousTest = tests[1].data();
+        final currentRisk = lastTest['riskLevel'];
+        final previousRisk = previousTest['riskLevel'];
+        
+        if (previousRisk == 'high' && currentRisk == 'moderate') {
+          await createNotification(NotificationModel(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            userId: userId,
+            type: NotificationType.info,
+            title: '🎉 Excellentes nouvelles !',
+            message: 'Vos résultats s\'améliorent ! Continuez vos efforts et maintenez une bonne hygiène respiratoire.',
+            createdAt: DateTime.now(),
+          ));
+        }
+      }
+
+      // 8. Tout va bien -> Rappel préventif mensuel
+      if (daysSinceLastTest >= 30 && lastTest['riskLevel'] == 'low') {
+        await sendReminderNotification(
+          userId,
+          '✅ Votre santé respiratoire semble bonne ! Test de contrôle mensuel recommandé.',
+        );
+      }
+
+    } catch (e) {
+      print('❌ Erreur notifications intelligentes: $e');
+    }
+  }
+
+  /// 📅 PLANIFIER DES RAPPELS AUTOMATIQUES
+  /// À appeler régulièrement (ex: chaque jour via background task)
+  Future<void> scheduleHealthReminders(String userId) async {
+    try {
+      // Vérifier la dernière notification envoyée
+      final lastNotifications = await _notificationsCollection
+          .where('userId', isEqualTo: userId)
+          .where('type', whereIn: ['reminder', 'alert'])
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (lastNotifications.docs.isNotEmpty) {
+        final data = lastNotifications.docs.first.data() as Map<String, dynamic>;
+        final lastNotifDate = (data['createdAt'] as Timestamp).toDate();
+        final hoursSinceLastNotif = DateTime.now().difference(lastNotifDate).inHours;
+        
+        // Ne pas envoyer plus d'une notification toutes les 24h
+        if (hoursSinceLastNotif < 24) {
+          return;
+        }
+      }
+
+      // Envoyer les notifications intelligentes
+      await sendHealthBasedReminders(userId);
+    } catch (e) {
+      print('❌ Erreur planification rappels: $e');
+    }
+  }
 }

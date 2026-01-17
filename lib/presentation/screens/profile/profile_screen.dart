@@ -1,21 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../data/services/auth_service.dart';
 import '../../../data/models/user_model.dart';
 import '../../../routes/app_routes.dart';
 
 /// 👤 ÉCRAN DE PROFIL UTILISATEUR
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _authService = AuthService();
   UserModel? _currentUser;
   bool _isLoading = true;
@@ -37,6 +41,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  /// 💾 SAUVEGARDER LES MODIFICATIONS DU PROFIL DANS FIREBASE
+  Future<void> _saveUserProfile() async {
+    if (_currentUser == null) return;
+
+    try {
+      // Mettre à jour la date de modification
+      final updatedUser = _currentUser!.copyWith(
+        updatedAt: DateTime.now(),
+      );
+
+      // Sauvegarder dans Firebase
+      await _authService.updateUserProfile(updatedUser);
+
+      setState(() {
+        _currentUser = updatedUser;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Profil enregistré avec succès'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erreur: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -132,6 +173,121 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ? '${_currentUser!.dateOfBirth!.day}/${_currentUser!.dateOfBirth!.month}/${_currentUser!.dateOfBirth!.year}'
                     : 'Non renseigné',
                 onTap: () => _showDatePicker(context),
+              ),
+              _buildInfoTile(
+                icon: Icons.wc_outlined,
+                title: 'Sexe',
+                value: _currentUser?.gender ?? 'Non renseigné',
+                onTap: () => _showGenderDialog(context),
+              ),
+              _buildInfoTile(
+                icon: Icons.height_outlined,
+                title: 'Taille',
+                value: _currentUser?.height != null ? '${_currentUser!.height} cm' : 'Non renseigné',
+                onTap: () => _showEditDialog(
+                  context,
+                  title: 'Taille (cm)',
+                  currentValue: _currentUser?.height?.toString() ?? '',
+                  keyboardType: TextInputType.number,
+                  onSave: (value) {
+                    setState(() {
+                      _currentUser = _currentUser?.copyWith(height: int.tryParse(value));
+                    });
+                  },
+                ),
+              ),
+              _buildInfoTile(
+                icon: Icons.monitor_weight_outlined,
+                title: 'Poids',
+                value: _currentUser?.weight != null ? '${_currentUser!.weight} kg' : 'Non renseigné',
+                onTap: () => _showEditDialog(
+                  context,
+                  title: 'Poids (kg)',
+                  currentValue: _currentUser?.weight?.toString() ?? '',
+                  keyboardType: TextInputType.number,
+                  onSave: (value) {
+                    setState(() {
+                      _currentUser = _currentUser?.copyWith(weight: int.tryParse(value));
+                    });
+                  },
+                ),
+              ),
+              _buildInfoTile(
+                icon: Icons.bloodtype_outlined,
+                title: 'Groupe sanguin',
+                value: _currentUser?.bloodType ?? 'Non renseigné',
+                onTap: () => _showBloodTypeDialog(context),
+              ),
+            ],
+          ),
+
+          // Informations médicales
+          _buildSection(
+            title: 'Données Médicales',
+            children: [
+              _buildInfoTile(
+                icon: Icons.medical_information_outlined,
+                title: 'Conditions médicales',
+                value: _currentUser?.medicalConditions ?? 'Aucune',
+                onTap: () => _showEditDialog(
+                  context,
+                  title: 'Conditions médicales',
+                  currentValue: _currentUser?.medicalConditions ?? '',
+                  maxLines: 3,
+                  onSave: (value) {
+                    setState(() {
+                      _currentUser = _currentUser?.copyWith(medicalConditions: value);
+                    });
+                  },
+                ),
+              ),
+              _buildInfoTile(
+                icon: Icons.warning_amber_outlined,
+                title: 'Allergies',
+                value: _currentUser?.allergies ?? 'Aucune',
+                onTap: () => _showEditDialog(
+                  context,
+                  title: 'Allergies',
+                  currentValue: _currentUser?.allergies ?? '',
+                  maxLines: 2,
+                  onSave: (value) {
+                    setState(() {
+                      _currentUser = _currentUser?.copyWith(allergies: value);
+                    });
+                  },
+                ),
+              ),
+              _buildInfoTile(
+                icon: Icons.medication_outlined,
+                title: 'Médicaments',
+                value: _currentUser?.medications ?? 'Aucun',
+                onTap: () => _showEditDialog(
+                  context,
+                  title: 'Médicaments actuels',
+                  currentValue: _currentUser?.medications ?? '',
+                  maxLines: 3,
+                  onSave: (value) {
+                    setState(() {
+                      _currentUser = _currentUser?.copyWith(medications: value);
+                    });
+                  },
+                ),
+              ),
+              _buildInfoTile(
+                icon: Icons.phone_in_talk_outlined,
+                title: 'Contact d\'urgence',
+                value: _currentUser?.emergencyContact ?? 'Non renseigné',
+                onTap: () => _showEditDialog(
+                  context,
+                  title: 'Contact d\'urgence',
+                  currentValue: _currentUser?.emergencyContact ?? '',
+                  keyboardType: TextInputType.phone,
+                  onSave: (value) {
+                    setState(() {
+                      _currentUser = _currentUser?.copyWith(emergencyContact: value);
+                    });
+                  },
+                ),
               ),
             ],
           ),
@@ -257,23 +413,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   color: Colors.white,
                   border: Border.all(color: Colors.white, width: 3),
                 ),
-                child: _currentUser?.profileImageUrl != null
+                child: _currentUser?.profileImageUrl != null && 
+                       _currentUser!.profileImageUrl!.isNotEmpty &&
+                       _currentUser!.profileImageUrl!.startsWith('http')
                     ? ClipOval(
-                        child: _currentUser!.profileImageUrl!.startsWith('http')
-                            ? Image.network(
-                                _currentUser!.profileImageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(Icons.person, size: 50, color: AppColors.primary);
-                                },
-                              )
-                            : Image.file(
-                                File(_currentUser!.profileImageUrl!),
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(Icons.person, size: 50, color: AppColors.primary);
-                                },
+                        child: Image.network(
+                          _currentUser!.profileImageUrl!,
+                          key: ValueKey(_currentUser!.profileImageUrl), // Force reload on change
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Center(
+                              child: CircularProgressIndicator(
+                                value: loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                    : null,
                               ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            print('❌ Erreur chargement photo: $error');
+                            return const Icon(Icons.person, size: 50, color: AppColors.primary);
+                          },
+                        ),
                       )
                     : const Icon(Icons.person, size: 50, color: AppColors.primary),
               ),
@@ -459,6 +621,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required String currentValue,
     required Function(String) onSave,
     TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
   }) {
     final controller = TextEditingController(text: currentValue);
     
@@ -469,6 +632,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         content: TextField(
           controller: controller,
           keyboardType: keyboardType,
+          maxLines: maxLines,
           decoration: InputDecoration(
             labelText: title,
             border: const OutlineInputBorder(),
@@ -481,13 +645,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Annuler'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (controller.text.isNotEmpty) {
                 onSave(controller.text);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('$title modifié avec succès')),
-                );
+                // Sauvegarder dans Firebase
+                await _saveUserProfile();
               }
             },
             style: ElevatedButton.styleFrom(
@@ -524,11 +687,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _currentUser = _currentUser?.copyWith(dateOfBirth: picked);
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Date de naissance modifiée avec succès')),
-        );
-      }
+      // Sauvegarder dans Firebase
+      await _saveUserProfile();
     }
   }
 
@@ -568,7 +728,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Annuler'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (firstNameController.text.isNotEmpty && lastNameController.text.isNotEmpty) {
                 setState(() {
                   _currentUser = _currentUser?.copyWith(
@@ -577,9 +737,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                 });
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Nom modifié avec succès')),
-                );
+                // Sauvegarder dans Firebase
+                await _saveUserProfile();
               }
             },
             style: ElevatedButton.styleFrom(
@@ -685,29 +844,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
         imageQuality: 85,
       );
 
-      if (image != null) {
-        // En mode mock, on simule l'upload et on garde le chemin local
-        // En production, il faudrait uploader sur Firebase Storage
-        setState(() {
-          _currentUser = _currentUser?.copyWith(
-            profileImageUrl: image.path, // En mock, chemin local
-          );
-        });
-        
+      if (image != null && _currentUser != null) {
+        // Afficher loader
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Photo de profil mise à jour avec succès'),
+              content: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  ),
+                  SizedBox(width: 16),
+                  Text('📤 Upload en cours...'),
+                ],
+              ),
+              duration: Duration(seconds: 30),
+            ),
+          );
+        }
+        
+        // Upload vers Firebase Storage
+        final storage = FirebaseStorage.instance;
+        final fileName = 'profile_${_currentUser!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final storageRef = storage.ref().child('profile_pictures/$fileName');
+        
+        // Upload le fichier
+        final bytes = await image.readAsBytes();
+        await storageRef.putData(
+          bytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+        
+        // Récupérer l'URL publique
+        final downloadUrl = await storageRef.getDownloadURL();
+        print('✅ Photo uploadée: $downloadUrl');
+        
+        // Mettre à jour avec l'URL Firebase
+        setState(() {
+          _currentUser = _currentUser?.copyWith(
+            profileImageUrl: downloadUrl,
+          );
+        });
+        
+        // Sauvegarder directement dans Firestore avec l'URL
+        await _authService.updateUserProfile(_currentUser!);
+        print('✅ Photo persistée dans Firestore: $downloadUrl');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Photo de profil sauvegardée'),
               backgroundColor: AppColors.success,
             ),
           );
         }
       }
     } catch (e) {
+      print('❌ Erreur upload photo: $e');
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de la sélection de l\'image: $e'),
+            content: Text('❌ Erreur: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -793,20 +994,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: const Text('Annuler'),
             ),
             ElevatedButton(
-              onPressed: () {
-                if (newPasswordController.text == confirmPasswordController.text &&
-                    newPasswordController.text.length >= 6) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Mot de passe modifié avec succès'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                } else {
+              onPressed: () async {
+                if (newPasswordController.text != confirmPasswordController.text) {
                   ScaffoldMessenger.of(this.context).showSnackBar(
                     const SnackBar(
                       content: Text('Les mots de passe ne correspondent pas'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                if (newPasswordController.text.length < 6) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Le mot de passe doit contenir au moins 6 caractères'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.pop(context);
+
+                try {
+                  final authService = ref.read(authServiceProvider);
+                  await authService.updatePassword(
+                    currentPassword: currentPasswordController.text,
+                    newPassword: newPasswordController.text,
+                  );
+
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ Mot de passe modifié avec succès'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(
+                      content: Text('❌ Erreur: $e'),
                       backgroundColor: AppColors.error,
                     ),
                   );
@@ -858,6 +1087,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Sélection du sexe
+  void _showGenderDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sélectionner le sexe'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.male, color: AppColors.primary),
+              title: const Text('Homme'),
+              onTap: () async {
+                setState(() {
+                  _currentUser = _currentUser?.copyWith(gender: 'Homme');
+                });
+                Navigator.pop(context);
+                await _saveUserProfile();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.female, color: AppColors.secondary),
+              title: const Text('Femme'),
+              onTap: () async {
+                setState(() {
+                  _currentUser = _currentUser?.copyWith(gender: 'Femme');
+                });
+                Navigator.pop(context);
+                await _saveUserProfile();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.help_outline, color: Colors.grey),
+              title: const Text('Autre'),
+              onTap: () async {
+                setState(() {
+                  _currentUser = _currentUser?.copyWith(gender: 'Autre');
+                });
+                Navigator.pop(context);
+                await _saveUserProfile();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Sélection du groupe sanguin
+  void _showBloodTypeDialog(BuildContext context) {
+    final bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Groupe sanguin'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: bloodTypes.map((type) => ListTile(
+              leading: const Icon(Icons.bloodtype, color: AppColors.error),
+              title: Text(type),
+              onTap: () async {
+                setState(() {
+                  _currentUser = _currentUser?.copyWith(bloodType: type);
+                });
+                Navigator.pop(context);
+                await _saveUserProfile();
+              },
+            )).toList(),
+          ),
         ),
       ),
     );

@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../core/providers/app_providers.dart';
 import '../../../routes/app_routes.dart';
-import '../../../data/models/device_model.dart';
 
-/// 📶 ÉCRAN DE SCAN DES BOÎTIERS BLUETOOTH
-/// Recherche et affiche les boîtiers RespiraBox disponibles
-class DeviceScanScreen extends StatefulWidget {
+/// 📶 ÉCRAN DE SCAN BLUETOOTH RÉEL
+/// Utilise RespiraBoxDeviceService pour scanner et connecter au prototype
+class DeviceScanScreen extends ConsumerStatefulWidget {
   const DeviceScanScreen({Key? key}) : super(key: key);
 
   @override
-  State<DeviceScanScreen> createState() => _DeviceScanScreenState();
+  ConsumerState<DeviceScanScreen> createState() => _DeviceScanScreenState();
 }
 
-class _DeviceScanScreenState extends State<DeviceScanScreen> {
+class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
   bool _isScanning = false;
-  final List<DeviceModel> _devices = [];
+  List<BluetoothDevice> _devices = [];
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -23,63 +26,119 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
     _startScan();
   }
 
+  @override
+  void dispose() {
+    FlutterBluePlus.stopScan();
+    super.dispose();
+  }
+
+  /// 🔍 DÉMARRER LE SCAN BLUETOOTH RÉEL
   Future<void> _startScan() async {
     setState(() {
       _isScanning = true;
       _devices.clear();
+      _errorMessage = null;
     });
 
-    // TODO: Implémenter le scan Bluetooth avec flutter_blue_plus
-    // Simulation de découverte de boîtiers
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Vérifier si Bluetooth est disponible
+      final isAvailable = await FlutterBluePlus.isAvailable;
+      if (!isAvailable) {
+        setState(() {
+          _errorMessage = 'Bluetooth non disponible sur cet appareil';
+          _isScanning = false;
+        });
+        return;
+      }
 
-    if (!mounted) return;
+      // Vérifier si Bluetooth est activé
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      if (adapterState != BluetoothAdapterState.on) {
+        setState(() {
+          _errorMessage = 'Veuillez activer le Bluetooth';
+          _isScanning = false;
+        });
+        return;
+      }
 
-    setState(() {
-      _devices.addAll([
-        DeviceModel(
-          id: 'CI-1138',
-          name: 'RespiraBox-1138',
-          signalStrength: -45,
-          batteryLevel: 87,
-          status: DeviceConnectionStatus.disconnected,
-        ),
-        DeviceModel(
-          id: 'CI-097B',
-          name: 'RespiraBox-097B',
-          signalStrength: -72,
-          batteryLevel: 65,
-          status: DeviceConnectionStatus.disconnected,
-        ),
-        DeviceModel(
-          id: 'OTHER-BT',
-          name: 'Autre appareil BT',
-          signalStrength: -88,
-          batteryLevel: 0,
-          status: DeviceConnectionStatus.disconnected,
-        ),
-      ]);
-      _isScanning = false;
-    });
+      // Utiliser le service RespiraBox pour scanner
+      final deviceService = ref.read(respiraBoxServiceProvider);
+      final foundDevices = await deviceService.scanForDevices(
+        timeout: const Duration(seconds: 10),
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _devices = foundDevices;
+        _isScanning = false;
+        if (foundDevices.isEmpty) {
+          _errorMessage = 'Aucun RespiraBox détecté. Assurez-vous que le boîtier est allumé.';
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Erreur lors du scan: $e';
+        _isScanning = false;
+      });
+    }
   }
 
-  Future<void> _connectToDevice(DeviceModel device) async {
-    // Simuler une connexion
+  /// 🔗 CONNECTER AU DEVICE SÉLECTIONNÉ
+  Future<void> _connectToDevice(BluetoothDevice device) async {
+    // Afficher le dialog de connexion
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
+      builder: (context) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Connexion à ${device.platformName}...',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
 
-    await Future.delayed(const Duration(seconds: 2));
-    
-    if (!mounted) return;
-    Navigator.pop(context); // Fermer le dialog
+    try {
+      // Utiliser le service pour se connecter
+      final deviceService = ref.read(respiraBoxServiceProvider);
+      await deviceService.connectToDevice(device);
 
-    // Naviguer vers la préparation du test
-    Navigator.pushNamed(context, AppRoutes.testPreparation);
+      // Mettre à jour l'état de connexion
+      ref.read(deviceConnectionProvider.notifier).state = true;
+      ref.read(connectedDeviceProvider.notifier).state = device.remoteId.toString();
+
+      if (!mounted) return;
+      Navigator.pop(context); // Fermer le dialog
+
+      // Succès: naviguer vers la préparation du test
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✓ Connecté à ${device.platformName}'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+
+      Navigator.pushNamed(context, AppRoutes.testPreparation);
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Fermer le dialog
+
+      // Erreur de connexion
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur de connexion: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   @override
@@ -94,14 +153,14 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Connexion au boîtier',
+          'Scanner RespiraBox',
           style: AppTextStyles.headline2.copyWith(color: AppColors.textPrimary),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline, color: AppColors.textPrimary),
             onPressed: () {
-              // TODO: Afficher l'aide
+              _showHelpDialog();
             },
           ),
         ],
@@ -111,46 +170,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
           children: [
             const SizedBox(height: 20),
             // Animation de scan
-            Center(
-              child: Container(
-                width: 200,
-                height: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary.withOpacity(0.1),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    if (_isScanning)
-                      Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.primary.withOpacity(0.3),
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.primary.withOpacity(0.2),
-                      ),
-                      child: const Icon(
-                        Icons.bluetooth_searching,
-                        size: 60,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _buildScanAnimation(),
             const SizedBox(height: 24),
             Text(
               _isScanning ? 'Recherche en cours...' : 'Recherche terminée',
@@ -162,7 +182,7 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Text(
-                'Assurez-vous que votre boîtier est allumé et à proximité.',
+                'Assurez-vous que votre RespiraBox est allumé et à proximité (moins de 10 mètres).',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textSecondary,
@@ -184,42 +204,34 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Appareils détectés',
-                      style: AppTextStyles.headline3,
+                    Row(
+                      children: [
+                        Text(
+                          'Appareils RespiraBox',
+                          style: AppTextStyles.headline3,
+                        ),
+                        const Spacer(),
+                        if (_devices.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '${_devices.length} trouvé${_devices.length > 1 ? 's' : ''}',
+                              style: TextStyle(
+                                color: AppColors.success,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     Expanded(
-                      child: _devices.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.bluetooth_disabled,
-                                    size: 64,
-                                    color: AppColors.textSecondary.withOpacity(0.5),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Aucun appareil détecté',
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : ListView.builder(
-                              itemCount: _devices.length,
-                              itemBuilder: (context, index) {
-                                final device = _devices[index];
-                                return _DeviceCard(
-                                  device: device,
-                                  onConnect: () => _connectToDevice(device),
-                                );
-                              },
-                            ),
+                      child: _buildDeviceList(),
                     ),
                   ],
                 ),
@@ -233,10 +245,9 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
                 height: 56,
                 child: OutlinedButton.icon(
                   onPressed: _isScanning ? null : _startScan,
-                  icon: const Icon(Icons.refresh),
+                  icon: Icon(_isScanning ? Icons.hourglass_empty : Icons.refresh),
                   label: Text(
-                    'Relancer la recherche',
-                    style: AppTextStyles.button,
+                    _isScanning ? 'Scan en cours...' : 'Relancer la recherche',
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.primary,
@@ -253,11 +264,159 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
       ),
     );
   }
+
+  Widget _buildScanAnimation() {
+    return Center(
+      child: Container(
+        width: 200,
+        height: 200,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.primary.withOpacity(0.1),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withOpacity(0.2),
+              ),
+              child: Icon(
+                _isScanning ? Icons.bluetooth_searching : Icons.bluetooth,
+                size: 60,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeviceList() {
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: AppColors.error.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.error,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _startScan,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Réessayer'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_devices.isEmpty && !_isScanning) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.bluetooth_disabled,
+              size: 64,
+              color: AppColors.textSecondary.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Aucun RespiraBox détecté',
+              style: AppTextStyles.headline3.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Vérifiez que le boîtier est allumé\net à proximité',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textLight,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: _devices.length,
+      itemBuilder: (context, index) {
+        final device = _devices[index];
+        return _DeviceCard(
+          device: device,
+          onConnect: () => _connectToDevice(device),
+        );
+      },
+    );
+  }
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Aide - Connexion'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHelpItem('1. Activez le Bluetooth sur votre téléphone'),
+            _buildHelpItem('2. Allumez votre boîtier RespiraBox'),
+            _buildHelpItem('3. Rapprochez-vous du boîtier (moins de 10m)'),
+            _buildHelpItem('4. Attendez que le scan détecte le boîtier'),
+            _buildHelpItem('5. Appuyez sur "Connecter"'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Compris'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHelpItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle, size: 16, color: AppColors.success),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: AppTextStyles.bodySmall),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-/// 📦 CARTE D'UN BOÎTIER DÉTECTÉ
+/// 📦 CARTE D'UN DEVICE BLUETOOTH DÉTECTÉ
 class _DeviceCard extends StatelessWidget {
-  final DeviceModel device;
+  final BluetoothDevice device;
   final VoidCallback onConnect;
 
   const _DeviceCard({
@@ -274,6 +433,13 @@ class _DeviceCard extends StatelessWidget {
         color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
@@ -285,11 +451,10 @@ class _DeviceCard extends StatelessWidget {
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(25),
             ),
-            child: Icon(
-              device.name.contains('RespiraBox')
-                  ? Icons.bluetooth
-                  : Icons.bluetooth_audio,
+            child: const Icon(
+              Icons.bluetooth_connected,
               color: AppColors.primary,
+              size: 28,
             ),
           ),
           const SizedBox(width: 16),
@@ -299,25 +464,17 @@ class _DeviceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  device.name,
+                  device.platformName.isNotEmpty 
+                      ? device.platformName 
+                      : 'RespiraBox ${device.remoteId.toString().substring(0, 8)}',
                   style: AppTextStyles.headline3,
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.signal_cellular_alt,
-                      size: 16,
-                      color: _getSignalColor(device.signalQuality),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      device.signalQualityText,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: _getSignalColor(device.signalQuality),
-                      ),
-                    ),
-                  ],
+                Text(
+                  'ID: ${device.remoteId.toString().substring(0, 17)}...',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textLight,
+                  ),
                 ),
               ],
             ),
@@ -327,35 +484,16 @@ class _DeviceCard extends StatelessWidget {
             onPressed: onConnect,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: Text(
-              'Connecter',
-              style: AppTextStyles.button.copyWith(
-                color: Colors.white,
-                fontSize: 14,
-              ),
-            ),
+            child: const Text('Connecter'),
           ),
         ],
       ),
     );
-  }
-
-  Color _getSignalColor(String quality) {
-    switch (quality) {
-      case 'excellent':
-        return AppColors.success;
-      case 'good':
-        return AppColors.success;
-      case 'medium':
-        return AppColors.warning;
-      case 'weak':
-        return AppColors.error;
-      default:
-        return AppColors.textSecondary;
-    }
   }
 }
