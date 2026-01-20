@@ -13,7 +13,7 @@ class UserModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isActive;
-  
+
   // 🏥 Informations médicales
   final int? height; // Taille en cm
   final int? weight; // Poids en kg

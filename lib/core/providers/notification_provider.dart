@@ -11,20 +11,24 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 });
 
 // Provider liste des notifications utilisateur
-final userNotificationsProvider = StreamProvider.autoDispose.family<List<NotificationModel>, String>((ref, userId) {
+final userNotificationsProvider = StreamProvider.autoDispose
+    .family<List<NotificationModel>, String>((ref, userId) {
   final notificationService = ref.watch(notificationServiceProvider);
   return notificationService.watchUserNotifications(userId);
 });
 
 // Provider notifications non lues
-final unreadNotificationsProvider = FutureProvider.autoDispose.family<List<NotificationModel>, String>((ref, userId) async {
+final unreadNotificationsProvider = FutureProvider.autoDispose
+    .family<List<NotificationModel>, String>((ref, userId) async {
   final notificationService = ref.watch(notificationServiceProvider);
   return notificationService.getUnreadNotifications(userId);
 });
 
 // Provider nombre de notifications non lues
-final unreadCountProvider = FutureProvider.autoDispose.family<int, String>((ref, userId) async {
-  final notifications = await ref.watch(unreadNotificationsProvider(userId).future);
+final unreadCountProvider =
+    FutureProvider.autoDispose.family<int, String>((ref, userId) async {
+  final notifications =
+      await ref.watch(unreadNotificationsProvider(userId).future);
   return notifications.length;
 });
 

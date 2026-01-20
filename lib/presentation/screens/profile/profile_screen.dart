@@ -183,7 +183,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               _buildInfoTile(
                 icon: Icons.height_outlined,
                 title: 'Taille',
-                value: _currentUser?.height != null ? '${_currentUser!.height} cm' : 'Non renseigné',
+                value: _currentUser?.height != null
+                    ? '${_currentUser!.height} cm'
+                    : 'Non renseigné',
                 onTap: () => _showEditDialog(
                   context,
                   title: 'Taille (cm)',
@@ -191,7 +193,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   keyboardType: TextInputType.number,
                   onSave: (value) {
                     setState(() {
-                      _currentUser = _currentUser?.copyWith(height: int.tryParse(value));
+                      _currentUser =
+                          _currentUser?.copyWith(height: int.tryParse(value));
                     });
                   },
                 ),
@@ -199,7 +202,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               _buildInfoTile(
                 icon: Icons.monitor_weight_outlined,
                 title: 'Poids',
-                value: _currentUser?.weight != null ? '${_currentUser!.weight} kg' : 'Non renseigné',
+                value: _currentUser?.weight != null
+                    ? '${_currentUser!.weight} kg'
+                    : 'Non renseigné',
                 onTap: () => _showEditDialog(
                   context,
                   title: 'Poids (kg)',
@@ -207,7 +212,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   keyboardType: TextInputType.number,
                   onSave: (value) {
                     setState(() {
-                      _currentUser = _currentUser?.copyWith(weight: int.tryParse(value));
+                      _currentUser =
+                          _currentUser?.copyWith(weight: int.tryParse(value));
                     });
                   },
                 ),
@@ -236,7 +242,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   maxLines: 3,
                   onSave: (value) {
                     setState(() {
-                      _currentUser = _currentUser?.copyWith(medicalConditions: value);
+                      _currentUser =
+                          _currentUser?.copyWith(medicalConditions: value);
                     });
                   },
                 ),
@@ -284,7 +291,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   keyboardType: TextInputType.phone,
                   onSave: (value) {
                     setState(() {
-                      _currentUser = _currentUser?.copyWith(emergencyContact: value);
+                      _currentUser =
+                          _currentUser?.copyWith(emergencyContact: value);
                     });
                   },
                 ),
@@ -413,31 +421,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   color: Colors.white,
                   border: Border.all(color: Colors.white, width: 3),
                 ),
-                child: _currentUser?.profileImageUrl != null && 
-                       _currentUser!.profileImageUrl!.isNotEmpty &&
-                       _currentUser!.profileImageUrl!.startsWith('http')
+                child: _currentUser?.profileImageUrl != null &&
+                        _currentUser!.profileImageUrl!.isNotEmpty &&
+                        _currentUser!.profileImageUrl!.startsWith('http')
                     ? ClipOval(
                         child: Image.network(
                           _currentUser!.profileImageUrl!,
-                          key: ValueKey(_currentUser!.profileImageUrl), // Force reload on change
+                          key: ValueKey(_currentUser!
+                              .profileImageUrl), // Force reload on change
                           fit: BoxFit.cover,
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
                             return Center(
                               child: CircularProgressIndicator(
-                                value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                value: loadingProgress.expectedTotalBytes !=
+                                        null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
                                     : null,
                               ),
                             );
                           },
                           errorBuilder: (context, error, stackTrace) {
                             print('❌ Erreur chargement photo: $error');
-                            return const Icon(Icons.person, size: 50, color: AppColors.primary);
+                            return const Icon(Icons.person,
+                                size: 50, color: AppColors.primary);
                           },
                         ),
                       )
-                    : const Icon(Icons.person, size: 50, color: AppColors.primary),
+                    : const Icon(Icons.person,
+                        size: 50, color: AppColors.primary),
               ),
               Positioned(
                 bottom: 0,
@@ -457,7 +470,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.camera_alt, size: 16, color: AppColors.primary),
+                    child: const Icon(Icons.camera_alt,
+                        size: 16, color: AppColors.primary),
                   ),
                 ),
               ),
@@ -609,7 +623,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: TextStyle(fontSize: 12, color: AppColors.textLight),
             )
           : null,
-      trailing: trailing ?? const Icon(Icons.chevron_right, color: AppColors.textLight),
+      trailing: trailing ??
+          const Icon(Icons.chevron_right, color: AppColors.textLight),
       onTap: onTap,
     );
   }
@@ -624,7 +639,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     int maxLines = 1,
   }) {
     final controller = TextEditingController(text: currentValue);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -694,9 +709,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // Édition du nom complet (prénom + nom)
   void _showFullNameEditDialog(BuildContext context) {
-    final firstNameController = TextEditingController(text: _currentUser?.firstName ?? '');
-    final lastNameController = TextEditingController(text: _currentUser?.lastName ?? '');
-    
+    final firstNameController =
+        TextEditingController(text: _currentUser?.firstName ?? '');
+    final lastNameController =
+        TextEditingController(text: _currentUser?.lastName ?? '');
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -729,7 +746,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (firstNameController.text.isNotEmpty && lastNameController.text.isNotEmpty) {
+              if (firstNameController.text.isNotEmpty &&
+                  lastNameController.text.isNotEmpty) {
                 setState(() {
                   _currentUser = _currentUser?.copyWith(
                     firstName: firstNameController.text,
@@ -801,7 +819,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     color: AppColors.secondary.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.photo_library, color: AppColors.secondary),
+                  child: const Icon(Icons.photo_library,
+                      color: AppColors.secondary),
                 ),
                 title: const Text('Choisir depuis la galerie'),
                 onTap: () {
@@ -817,7 +836,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       color: AppColors.error.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.delete_outline, color: AppColors.error),
+                    child: const Icon(Icons.delete_outline,
+                        color: AppColors.error),
                   ),
                   title: const Text('Supprimer la photo'),
                   onTap: () {
@@ -854,7 +874,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   ),
                   SizedBox(width: 16),
                   Text('📤 Upload en cours...'),
@@ -864,34 +885,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           );
         }
-        
+
         // Upload vers Firebase Storage
         final storage = FirebaseStorage.instance;
-        final fileName = 'profile_${_currentUser!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final fileName =
+            'profile_${_currentUser!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final storageRef = storage.ref().child('profile_pictures/$fileName');
-        
+
         // Upload le fichier
         final bytes = await image.readAsBytes();
         await storageRef.putData(
           bytes,
           SettableMetadata(contentType: 'image/jpeg'),
         );
-        
+
         // Récupérer l'URL publique
         final downloadUrl = await storageRef.getDownloadURL();
         print('✅ Photo uploadée: $downloadUrl');
-        
+
         // Mettre à jour avec l'URL Firebase
         setState(() {
           _currentUser = _currentUser?.copyWith(
             profileImageUrl: downloadUrl,
           );
         });
-        
+
         // Sauvegarder directement dans Firestore avec l'URL
         await _authService.updateUserProfile(_currentUser!);
         print('✅ Photo persistée dans Firestore: $downloadUrl');
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -921,7 +943,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() {
       _currentUser = _currentUser?.copyWith(profileImageUrl: null);
     });
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Photo de profil supprimée'),
@@ -954,8 +976,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     labelText: 'Mot de passe actuel',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureCurrent ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setState(() => obscureCurrent = !obscureCurrent),
+                      icon: Icon(obscureCurrent
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () =>
+                          setState(() => obscureCurrent = !obscureCurrent),
                     ),
                   ),
                 ),
@@ -967,7 +992,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     labelText: 'Nouveau mot de passe',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureNew ? Icons.visibility : Icons.visibility_off),
+                      icon: Icon(
+                          obscureNew ? Icons.visibility : Icons.visibility_off),
                       onPressed: () => setState(() => obscureNew = !obscureNew),
                     ),
                   ),
@@ -980,8 +1006,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     labelText: 'Confirmer le mot de passe',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(obscureConfirm ? Icons.visibility : Icons.visibility_off),
-                      onPressed: () => setState(() => obscureConfirm = !obscureConfirm),
+                      icon: Icon(obscureConfirm
+                          ? Icons.visibility
+                          : Icons.visibility_off),
+                      onPressed: () =>
+                          setState(() => obscureConfirm = !obscureConfirm),
                     ),
                   ),
                 ),
@@ -995,7 +1024,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             ElevatedButton(
               onPressed: () async {
-                if (newPasswordController.text != confirmPasswordController.text) {
+                if (newPasswordController.text !=
+                    confirmPasswordController.text) {
                   ScaffoldMessenger.of(this.context).showSnackBar(
                     const SnackBar(
                       content: Text('Les mots de passe ne correspondent pas'),
@@ -1008,7 +1038,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 if (newPasswordController.text.length < 6) {
                   ScaffoldMessenger.of(this.context).showSnackBar(
                     const SnackBar(
-                      content: Text('Le mot de passe doit contenir au moins 6 caractères'),
+                      content: Text(
+                          'Le mot de passe doit contenir au moins 6 caractères'),
                       backgroundColor: AppColors.error,
                     ),
                   );
@@ -1143,7 +1174,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // Sélection du groupe sanguin
   void _showBloodTypeDialog(BuildContext context) {
     final bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1151,17 +1182,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            children: bloodTypes.map((type) => ListTile(
-              leading: const Icon(Icons.bloodtype, color: AppColors.error),
-              title: Text(type),
-              onTap: () async {
-                setState(() {
-                  _currentUser = _currentUser?.copyWith(bloodType: type);
-                });
-                Navigator.pop(context);
-                await _saveUserProfile();
-              },
-            )).toList(),
+            children: bloodTypes
+                .map((type) => ListTile(
+                      leading:
+                          const Icon(Icons.bloodtype, color: AppColors.error),
+                      title: Text(type),
+                      onTap: () async {
+                        setState(() {
+                          _currentUser =
+                              _currentUser?.copyWith(bloodType: type);
+                        });
+                        Navigator.pop(context);
+                        await _saveUserProfile();
+                      },
+                    ))
+                .toList(),
           ),
         ),
       ),

@@ -22,7 +22,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _authService = AuthService();
-  
+
   String _selectedGender = 'Homme';
   DateTime? _selectedDate;
   bool _isPasswordVisible = false;
@@ -187,7 +187,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: const Icon(Icons.person_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderColor),
+                      borderSide:
+                          const BorderSide(color: AppColors.borderColor),
                     ),
                   ),
                   validator: (value) {
@@ -209,7 +210,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: const Icon(Icons.person_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderColor),
+                      borderSide:
+                          const BorderSide(color: AppColors.borderColor),
                     ),
                   ),
                   validator: (value) {
@@ -232,7 +234,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: const Icon(Icons.email_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderColor),
+                      borderSide:
+                          const BorderSide(color: AppColors.borderColor),
                     ),
                   ),
                   validator: (value) {
@@ -259,7 +262,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: const Icon(Icons.phone_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderColor),
+                      borderSide:
+                          const BorderSide(color: AppColors.borderColor),
                     ),
                   ),
                   validator: (value) {
@@ -277,14 +281,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 InkWell(
                   onTap: _selectDate,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
                     decoration: BoxDecoration(
                       border: Border.all(color: AppColors.borderColor),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_today_outlined, color: AppColors.textSecondary),
+                        const Icon(Icons.calendar_today_outlined,
+                            color: AppColors.textSecondary),
                         const SizedBox(width: 12),
                         Text(
                           _selectedDate != null
@@ -311,7 +317,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: const Icon(Icons.transgender_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderColor),
+                      borderSide:
+                          const BorderSide(color: AppColors.borderColor),
                     ),
                   ),
                   items: ['Homme', 'Femme', 'Autre'].map((String value) {
@@ -351,7 +358,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderColor),
+                      borderSide:
+                          const BorderSide(color: AppColors.borderColor),
                     ),
                   ),
                   validator: (value) {
@@ -367,7 +375,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
 
                 // Confirmer mot de passe
-                Text('Confirmer le mot de passe', style: AppTextStyles.bodyMedium),
+                Text('Confirmer le mot de passe',
+                    style: AppTextStyles.bodyMedium),
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _confirmPasswordController,
@@ -383,13 +392,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       onPressed: () {
                         setState(() {
-                          _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                          _isConfirmPasswordVisible =
+                              !_isConfirmPasswordVisible;
                         });
                       },
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.borderColor),
+                      borderSide:
+                          const BorderSide(color: AppColors.borderColor),
                     ),
                   ),
                   validator: (value) {
@@ -416,7 +427,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: AppColors.error, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -446,7 +458,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ? const CircularProgressIndicator(color: Colors.white)
                         : Text(
                             'Créer un compte',
-                            style: AppTextStyles.button.copyWith(color: Colors.white),
+                            style: AppTextStyles.button
+                                .copyWith(color: Colors.white),
                           ),
                   ),
                 ),
@@ -463,7 +476,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, AppRoutes.login),
+                      onTap: () =>
+                          Navigator.pushNamed(context, AppRoutes.login),
                       child: Text(
                         'Se connecter',
                         style: AppTextStyles.bodyMedium.copyWith(

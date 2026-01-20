@@ -22,10 +22,11 @@ class _MainHomeScreenState extends ConsumerState<MainHomeScreen> {
   int _currentIndex = 0;
 
   List<Widget> get _pages => [
-    DashboardPage(onTabChange: (index) => setState(() => _currentIndex = index)),
-    const HistoryScreen(),
-    const ProfileScreen(),
-  ];
+        DashboardPage(
+            onTabChange: (index) => setState(() => _currentIndex = index)),
+        const HistoryScreen(),
+        const ProfileScreen(),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +73,7 @@ class _MainHomeScreenState extends ConsumerState<MainHomeScreen> {
 /// 📊 PAGE DASHBOARD (ONGLET ACCUEIL)
 class DashboardPage extends ConsumerStatefulWidget {
   final Function(int) onTabChange;
-  
+
   const DashboardPage({Key? key, required this.onTabChange}) : super(key: key);
 
   @override
@@ -153,7 +154,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               color: AppColors.primary.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.notifications_outlined, color: AppColors.primary),
+            child: const Icon(Icons.notifications_outlined,
+                color: AppColors.primary),
           ),
         ),
       ],
@@ -208,7 +210,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -319,22 +322,24 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             }
             return Column(
               children: tests.take(2).map((test) {
-                final riskColor = test.riskLevel == 'low' 
-                    ? AppColors.success 
-                    : test.riskLevel == 'moderate' 
-                        ? AppColors.warning 
+                final riskColor = test.riskLevel == 'low'
+                    ? AppColors.success
+                    : test.riskLevel == 'moderate'
+                        ? AppColors.warning
                         : AppColors.error;
                 final riskText = test.riskLevel == 'low'
                     ? 'Faible'
                     : test.riskLevel == 'moderate'
                         ? 'Moyen'
                         : 'Élevé';
-                
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _buildTestCard(
-                    date: '${test.testDate.day} ${_getMonthName(test.testDate.month)} ${test.testDate.year}',
-                    time: '${test.testDate.hour.toString().padLeft(2, '0')}:${test.testDate.minute.toString().padLeft(2, '0')}',
+                    date:
+                        '${test.testDate.day} ${_getMonthName(test.testDate.month)} ${test.testDate.year}',
+                    time:
+                        '${test.testDate.hour.toString().padLeft(2, '0')}:${test.testDate.minute.toString().padLeft(2, '0')}',
                     riskLevel: riskText,
                     spo2: (test.spo2 ?? 0).round(),
                     heartRate: test.heartRate ?? 0,
@@ -400,8 +405,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   String _getMonthName(int month) {
     const months = [
-      'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-      'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'
+      'Jan',
+      'Fév',
+      'Mar',
+      'Avr',
+      'Mai',
+      'Juin',
+      'Juil',
+      'Août',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Déc'
     ];
     return months[month - 1];
   }
@@ -493,7 +508,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             final totalTests = tests.length;
             final avgSpo2 = tests.isEmpty
                 ? 0
-                : (tests.map((t) => t.spo2 ?? 0).reduce((a, b) => a + b) / tests.length).round();
+                : (tests.map((t) => t.spo2 ?? 0).reduce((a, b) => a + b) /
+                        tests.length)
+                    .round();
 
             return Row(
               children: [

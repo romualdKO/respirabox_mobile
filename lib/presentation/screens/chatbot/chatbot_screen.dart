@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:record/record.dart';
+import 'package:flutter_sound/flutter_sound.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../data/services/gemini_ai_service.dart';
@@ -28,9 +31,9 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   final AssemblyAIService _assemblyAIService = AssemblyAIService();
   ConversationModel? _currentConversation;
   final ConversationService _conversationService = ConversationService();
-  
-  // 🎤 Enregistrement vocal
-  final AudioRecorder _audioRecorder = AudioRecorder();
+
+  // 🎤 Enregistrement vocal avec flutter_sound
+  final FlutterSoundRecorder _audioRecorder = FlutterSoundRecorder();
   bool _isRecording = false;
   String? _recordingPath;
 
@@ -38,47 +41,56 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   void initState() {
     super.initState();
     _loadOrCreateConversation();
+    _initAudioRecorder();
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _audioRecorder.closeRecorder();
     super.dispose();
+  }
+
+  /// Initialiser FlutterSoundRecorder
+  Future<void> _initAudioRecorder() async {
+    await _audioRecorder.openRecorder();
   }
 
   /// Charger la dernière conversation active ou en créer une nouvelle
   Future<void> _loadOrCreateConversation() async {
     try {
       final userAsync = ref.read(currentUserProvider);
-      
+
       final user = await userAsync.when(
         data: (user) => user,
         loading: () => null,
         error: (_, __) => null,
       );
-      
+
       if (user == null) {
         print('❌ Utilisateur non connecté');
         return;
       }
-      
+
       print('📂 Chargement conversation pour user: ${user.id}');
-      
+
       // Essayer de charger la dernière conversation active
-      final activeConv = await _conversationService.getActiveConversation(user.id);
-      
+      final activeConv =
+          await _conversationService.getActiveConversation(user.id);
+
       if (activeConv != null && activeConv.messages.isNotEmpty) {
         // Charger les messages existants
-        print('✅ Conversation active trouvée: ${activeConv.id} avec ${activeConv.messages.length} messages');
+        print(
+            '✅ Conversation active trouvée: ${activeConv.id} avec ${activeConv.messages.length} messages');
         setState(() {
           _currentConversation = activeConv;
           _messages.clear();
           _messages.addAll(activeConv.messages.map((m) => ChatMessage(
-            text: m.text,
-            isUser: m.isUser,
-            timestamp: m.timestamp,
-          )));
+                text: m.text,
+                isUser: m.isUser,
+                timestamp: m.timestamp,
+              )));
         });
       } else {
         // Créer une nouvelle conversation
@@ -94,34 +106,34 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   Future<void> _createNewConversation() async {
     try {
       final userAsync = ref.read(currentUserProvider);
-      
+
       final user = await userAsync.when(
         data: (user) => user,
         loading: () => null,
         error: (_, __) => null,
       );
-      
+
       if (user == null) {
         print('❌ Impossible de créer conversation: utilisateur non connecté');
         return;
       }
-      
+
       // Désactiver toutes les conversations précédentes
       await _conversationService.deactivateAllConversations(user.id);
-      
+
       // Créer une nouvelle conversation
       final newConv = await _conversationService.createConversation(
         userId: user.id,
         firstMessage: 'Nouvelle conversation',
       );
-      
+
       print('✅ Conversation créée: ${newConv.id}');
-      
+
       setState(() {
         _currentConversation = newConv;
         _messages.clear();
       });
-      
+
       _addWelcomeMessage();
     } catch (e) {
       print('❌ Erreur création conversation: $e');
@@ -134,10 +146,10 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
       _currentConversation = conversation;
       _messages.clear();
       _messages.addAll(conversation.messages.map((m) => ChatMessage(
-        text: m.text,
-        isUser: m.isUser,
-        timestamp: m.timestamp,
-      )));
+            text: m.text,
+            isUser: m.isUser,
+            timestamp: m.timestamp,
+          )));
     });
     Navigator.pop(context); // Fermer le drawer
   }
@@ -153,20 +165,20 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     } else {
       greeting = 'Bonsoir';
     }
-    
+
     final welcomeMsg = ChatMessage(
-      text: '🤖 $greeting ! Je suis votre assistant IA RespiraBox propulsé par Cohere AI.\n\n'
+      text: '🤖 $greeting ! Je suis votre assistant médical RespiraBox.\n\n'
           '💬 Parlez-moi de ce que vous voulez, je comprends TOUT !\n\n'
           '✨ Posez-moi n\'importe quelle question sur votre santé respiratoire, '
           'vos tests, vos symptômes... Je suis là pour vous aider !',
       isUser: false,
       timestamp: DateTime.now(),
     );
-    
+
     setState(() {
       _messages.add(welcomeMsg);
     });
-    
+
     // Sauvegarder dans la conversation
     if (_currentConversation != null) {
       _conversationService.addMessage(
@@ -196,7 +208,8 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
     // Sauvegarder le message utilisateur dans la conversation
     if (_currentConversation != null) {
-      print('💾 Sauvegarde message utilisateur dans conversation: ${_currentConversation!.id}');
+      print(
+          '💾 Sauvegarde message utilisateur dans conversation: ${_currentConversation!.id}');
       await _conversationService.addMessage(
         conversationId: _currentConversation!.id,
         text: userMessage.text,
@@ -209,13 +222,14 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     try {
       // Récupérer l'utilisateur actuel
       final userAsync = ref.read(currentUserProvider);
-      
+
       userAsync.when(
         data: (user) async {
           if (user == null) {
             setState(() {
               _messages.add(ChatMessage(
-                text: '❌ Veuillez vous connecter pour utiliser l\'assistant IA.',
+                text:
+                    '❌ Veuillez vous connecter pour utiliser l\'assistant IA.',
                 isUser: false,
                 timestamp: DateTime.now(),
               ));
@@ -224,7 +238,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
             return;
           }
 
-          // L'IA Cohere répond INTELLIGEMMENT à tout
+          // L'assistant médical répond intelligemment à tout
           // Elle analyse automatiquement l'intention de l'utilisateur
           String botResponse = await _geminiService.sendMessage(
             userMessage: text,
@@ -244,14 +258,16 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
           // Sauvegarder la réponse de l'IA dans la conversation
           if (_currentConversation != null) {
-            print('💾 Sauvegarde réponse IA dans conversation: ${_currentConversation!.id}');
+            print(
+                '💾 Sauvegarde réponse IA dans conversation: ${_currentConversation!.id}');
             await _conversationService.addMessage(
               conversationId: _currentConversation!.id,
               text: botMessage.text,
               isUser: false,
             );
           } else {
-            print('⚠️ Aucune conversation active pour sauvegarder la réponse IA');
+            print(
+                '⚠️ Aucune conversation active pour sauvegarder la réponse IA');
           }
 
           _scrollToBottom();
@@ -303,41 +319,39 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     });
   }
 
-  /// 🎤 Démarrer/Arrêter l'enregistrement vocal
+  /// 🎤 Démarrer/Arrêter l'enregistrement vocal avec flutter_sound
   Future<void> _toggleRecording() async {
     if (_isRecording) {
       // Arrêter l'enregistrement
-      final path = await _audioRecorder.stop();
+      final path = await _audioRecorder.stopRecorder();
       if (path != null) {
         setState(() {
           _isRecording = false;
           _recordingPath = path;
         });
-        
+
         // Afficher dialogue: transcription ou analyse de toux
         _showAudioOptionsDialog(path);
       }
     } else {
       // Vérifier les permissions
-      if (await _audioRecorder.hasPermission()) {
+      final status = await Permission.microphone.request();
+      if (status.isGranted) {
         // Démarrer l'enregistrement
-        // Pour le web, on utilise un nom de fichier simple
-        final filePath = 'recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
-        
-        await _audioRecorder.start(
-          const RecordConfig(
-            encoder: AudioEncoder.aacLc,
-            sampleRate: 44100,
-            bitRate: 128000,
-          ),
-          path: filePath,
+        final directory = await getApplicationDocumentsDirectory();
+        final filePath =
+            '${directory.path}/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
+
+        await _audioRecorder.startRecorder(
+          toFile: filePath,
+          codec: Codec.aacADTS,
         );
-        
+
         setState(() {
           _isRecording = true;
           _recordingPath = filePath;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Row(
@@ -425,13 +439,14 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     _scrollToBottom();
 
     try {
-      final transcription = await _assemblyAIService.transcribeFromFile(audioPath);
-      
+      final transcription =
+          await _assemblyAIService.transcribeFromFile(audioPath);
+
       // Retirer le message de chargement
       setState(() {
         _messages.removeLast();
       });
-      
+
       if (transcription.isNotEmpty) {
         // Envoyer le texte transcrit comme message
         await _sendMessage(transcription);
@@ -472,12 +487,12 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
     try {
       final analysis = await _assemblyAIService.analyzeCough(audioPath);
-      
+
       // Retirer le message de chargement
       setState(() {
         _messages.removeLast();
       });
-      
+
       // Créer un message pour l'utilisateur
       final userMessage = '🎤 [Audio de toux envoyé pour analyse]';
       setState(() {
@@ -487,7 +502,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
           timestamp: DateTime.now(),
         ));
       });
-      
+
       // Sauvegarder dans la conversation
       if (_currentConversation != null) {
         await _conversationService.addMessage(
@@ -496,7 +511,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
           isUser: true,
         );
       }
-      
+
       // Construire le contexte pour l'IA
       final analysisContext = '''
 J'ai enregistré un audio de toux. Voici l'analyse:
@@ -517,18 +532,18 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
               userMessage: analysisContext,
               userId: user.id,
             );
-            
+
             final botMessage = ChatMessage(
               text: aiResponse,
               isUser: false,
               timestamp: DateTime.now(),
             );
-            
+
             setState(() {
               _messages.add(botMessage);
               _isTyping = false;
             });
-            
+
             // Sauvegarder la réponse de l'IA
             if (_currentConversation != null) {
               await _conversationService.addMessage(
@@ -537,7 +552,7 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                 isUser: false,
               );
             }
-            
+
             _scrollToBottom();
           }
         },
@@ -561,7 +576,7 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
-    
+
     return userAsync.when(
       data: (user) => Scaffold(
         backgroundColor: AppColors.backgroundLight,
@@ -582,7 +597,8 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                   color: Colors.white24,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.smart_toy, color: Colors.white, size: 24),
+                child:
+                    const Icon(Icons.smart_toy, color: Colors.white, size: 24),
               ),
               const SizedBox(width: 12),
               Column(
@@ -597,11 +613,11 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                     ),
                   ),
                   Text(
-                    _currentConversation != null 
-                      ? _currentConversation!.title.length > 20
-                        ? '${_currentConversation!.title.substring(0, 20)}...'
-                        : _currentConversation!.title
-                      : 'Nouvelle conversation',
+                    _currentConversation != null
+                        ? _currentConversation!.title.length > 20
+                            ? '${_currentConversation!.title.substring(0, 20)}...'
+                            : _currentConversation!.title
+                        : 'Nouvelle conversation',
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
@@ -624,72 +640,74 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
           ],
         ),
         drawer: user != null ? _buildHistoryDrawer(user.id) : null,
-      body: Column(
-        children: [
-          // Avertissement médical
-          Container(
-            padding: const EdgeInsets.all(12),
-            color: AppColors.warning.withOpacity(0.1),
-            child: Row(
-              children: [
-                const Icon(Icons.warning_amber, color: AppColors.warning, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Cet assistant ne remplace pas un avis médical professionnel',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Messages
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                return _buildMessageBubble(_messages[index]);
-              },
-            ),
-          ),
-
-          // Indicateur de frappe
-          if (_isTyping)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        body: Column(
+          children: [
+            // Avertissement médical
+            Container(
+              padding: const EdgeInsets.all(12),
+              color: AppColors.warning.withOpacity(0.1),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildTypingDot(0),
-                        const SizedBox(width: 4),
-                        _buildTypingDot(1),
-                        const SizedBox(width: 4),
-                        _buildTypingDot(2),
-                      ],
+                  const Icon(Icons.warning_amber,
+                      color: AppColors.warning, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Cet assistant ne remplace pas un avis médical professionnel',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textDark,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
 
-          // Zone de saisie
-          _buildMessageInput(),
-        ],
-      ),
+            // Messages
+            Expanded(
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(16),
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  return _buildMessageBubble(_messages[index]);
+                },
+              ),
+            ),
+
+            // Indicateur de frappe
+            if (_isTyping)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildTypingDot(0),
+                          const SizedBox(width: 4),
+                          _buildTypingDot(1),
+                          const SizedBox(width: 4),
+                          _buildTypingDot(2),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Zone de saisie
+            _buildMessageInput(),
+          ],
+        ),
       ),
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -717,7 +735,8 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.smart_toy, color: AppColors.primary, size: 20),
+              child: const Icon(Icons.smart_toy,
+                  color: AppColors.primary, size: 20),
             ),
             const SizedBox(width: 8),
           ],
@@ -730,9 +749,7 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: message.isUser
-                        ? AppColors.primary
-                        : Colors.white,
+                    color: message.isUser ? AppColors.primary : Colors.white,
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(16),
                       topRight: const Radius.circular(16),
@@ -775,7 +792,8 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                 color: AppColors.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.person, color: AppColors.primary, size: 20),
+              child:
+                  const Icon(Icons.person, color: AppColors.primary, size: 20),
             ),
           ],
         ],
@@ -834,19 +852,24 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                 color: Colors.white,
               ),
               onPressed: _toggleRecording,
-              tooltip: _isRecording ? 'Arrêter l\'enregistrement' : 'Enregistrer un message vocal',
+              tooltip: _isRecording
+                  ? 'Arrêter l\'enregistrement'
+                  : 'Enregistrer un message vocal',
             ),
           ),
           const SizedBox(width: 8),
-          
+
           Expanded(
             child: TextField(
               controller: _messageController,
               decoration: InputDecoration(
-                hintText: _isRecording ? '🎤 Enregistrement...' : 'Posez votre question...',
+                hintText: _isRecording
+                    ? '🎤 Enregistrement...'
+                    : 'Posez votre question...',
                 hintStyle: TextStyle(
                   color: _isRecording ? AppColors.error : AppColors.textLight,
-                  fontWeight: _isRecording ? FontWeight.bold : FontWeight.normal,
+                  fontWeight:
+                      _isRecording ? FontWeight.bold : FontWeight.normal,
                 ),
                 filled: true,
                 fillColor: AppColors.backgroundLight,
@@ -913,7 +936,7 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '🤖 Propulsé par Cohere AI',
+                '🤖 Assistant médical RespiraBox',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
               const SizedBox(height: 10),
@@ -961,7 +984,7 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
   /// 📋 Drawer de l'historique des conversations
   Widget _buildHistoryDrawer(String userId) {
     final conversationsAsync = ref.watch(userConversationsProvider(userId));
-    
+
     return Drawer(
       child: SafeArea(
         child: Column(
@@ -993,7 +1016,7 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                 ],
               ),
             ),
-            
+
             // Bouton nouvelle conversation
             Padding(
               padding: const EdgeInsets.all(16),
@@ -1011,9 +1034,9 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                 ),
               ),
             ),
-            
+
             const Divider(height: 1),
-            
+
             // Liste des conversations
             Expanded(
               child: conversationsAsync.when(
@@ -1023,7 +1046,8 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
+                          Icon(Icons.chat_bubble_outline,
+                              size: 64, color: Colors.grey),
                           SizedBox(height: 16),
                           Text(
                             'Aucune conversation',
@@ -1033,13 +1057,13 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                       ),
                     );
                   }
-                  
+
                   return ListView.builder(
                     itemCount: conversations.length,
                     itemBuilder: (context, index) {
                       final conv = conversations[index];
                       final isActive = conv.id == _currentConversation?.id;
-                      
+
                       return ListTile(
                         selected: isActive,
                         selectedTileColor: AppColors.primary.withOpacity(0.1),
@@ -1062,7 +1086,8 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                            fontWeight:
+                                isActive ? FontWeight.bold : FontWeight.normal,
                           ),
                         ),
                         subtitle: Text(
@@ -1094,7 +1119,7 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    
+
     if (diff.inMinutes < 60) {
       return 'Il y a ${diff.inMinutes} min';
     } else if (diff.inHours < 24) {
@@ -1128,15 +1153,15 @@ Peux-tu analyser cette toux et me donner des conseils médicaux ?
         ],
       ),
     );
-    
+
     if (confirm == true) {
       await _conversationService.deleteConversation(conversationId);
-      
+
       // Si c'est la conversation actuelle, en créer une nouvelle
       if (_currentConversation?.id == conversationId) {
         await _createNewConversation();
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('✅ Conversation supprimée')),

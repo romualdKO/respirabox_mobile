@@ -61,19 +61,22 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
         return;
       }
 
-      // Utiliser le service RespiraBox pour scanner
+      // Utiliser le service RespiraBox pour scanner TOUS les appareils
       final deviceService = ref.read(respiraBoxServiceProvider);
       final foundDevices = await deviceService.scanForDevices(
-        timeout: const Duration(seconds: 10),
+        timeout: const Duration(seconds: 15),
       );
 
       if (!mounted) return;
 
+      print('🔍 ${foundDevices.length} appareils trouvés au total');
+
       setState(() {
-        _devices = foundDevices;
+        _devices = foundDevices; // Afficher TOUS les appareils trouvés
         _isScanning = false;
         if (foundDevices.isEmpty) {
-          _errorMessage = 'Aucun RespiraBox détecté. Assurez-vous que le boîtier est allumé.';
+          _errorMessage =
+              'Aucun appareil Bluetooth détecté. Vérifiez que le boîtier est allumé.';
         }
       });
     } catch (e) {
@@ -113,7 +116,8 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
 
       // Mettre à jour l'état de connexion
       ref.read(deviceConnectionProvider.notifier).state = true;
-      ref.read(connectedDeviceProvider.notifier).state = device.remoteId.toString();
+      ref.read(connectedDeviceProvider.notifier).state =
+          device.remoteId.toString();
 
       if (!mounted) return;
       Navigator.pop(context); // Fermer le dialog
@@ -207,13 +211,14 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
                     Row(
                       children: [
                         Text(
-                          'Appareils RespiraBox',
+                          'Appareils Bluetooth',
                           style: AppTextStyles.headline3,
                         ),
                         const Spacer(),
                         if (_devices.isNotEmpty)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
                               color: AppColors.success.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
@@ -245,7 +250,8 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
                 height: 56,
                 child: OutlinedButton.icon(
                   onPressed: _isScanning ? null : _startScan,
-                  icon: Icon(_isScanning ? Icons.hourglass_empty : Icons.refresh),
+                  icon:
+                      Icon(_isScanning ? Icons.hourglass_empty : Icons.refresh),
                   label: Text(
                     _isScanning ? 'Scan en cours...' : 'Relancer la recherche',
                   ),
@@ -341,14 +347,14 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Aucun RespiraBox détecté',
+              'Aucun appareil détecté',
               style: AppTextStyles.headline3.copyWith(
                 color: AppColors.textSecondary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Vérifiez que le boîtier est allumé\net à proximité',
+              'Vérifiez que le Bluetooth est activé\nsur votre appareil',
               textAlign: TextAlign.center,
               style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.textLight,
@@ -464,8 +470,8 @@ class _DeviceCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  device.platformName.isNotEmpty 
-                      ? device.platformName 
+                  device.platformName.isNotEmpty
+                      ? device.platformName
                       : 'RespiraBox ${device.remoteId.toString().substring(0, 8)}',
                   style: AppTextStyles.headline3,
                 ),

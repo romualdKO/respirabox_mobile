@@ -8,10 +8,12 @@ final conversationServiceProvider = Provider<ConversationService>((ref) {
 });
 
 /// 📦 PROVIDER DE LA CONVERSATION ACTIVE
-final activeConversationProvider = StateProvider<ConversationModel?>((ref) => null);
+final activeConversationProvider =
+    StateProvider<ConversationModel?>((ref) => null);
 
 /// 📦 PROVIDER DES CONVERSATIONS DE L'UTILISATEUR
-final userConversationsProvider = StreamProvider.family<List<ConversationModel>, String>(
+final userConversationsProvider =
+    StreamProvider.family<List<ConversationModel>, String>(
   (ref, userId) {
     final service = ref.watch(conversationServiceProvider);
     return service.watchUserConversations(userId);

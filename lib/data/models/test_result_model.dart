@@ -7,22 +7,22 @@ class TestResultModel {
   final String userId; // ID de l'utilisateur ayant effectué le test
   final String deviceId; // ID du boîtier RespiraBox utilisé
   final DateTime testDate;
-  
+
   // 📊 Données vitales mesurées
   final double spo2; // Saturation en oxygène (%)
   final int heartRate; // Fréquence cardiaque (BPM)
   final double temperature; // Température corporelle (°C)
-  
+
   // 🎙️ Données audio
   final String audioFileUrl; // URL du fichier audio (Firebase Storage)
   final int audioDuration; // Durée de l'enregistrement (secondes)
   final String audioQuality; // 'good', 'medium', 'poor'
-  
+
   // 🤖 Analyse IA
   final DiagnosticResult? diagnostic;
   final int riskScore; // Score de risque global (0-100)
   final RiskLevel riskLevel; // Niveau de risque
-  
+
   // 📝 Métadonnées
   final TestStatus status;
   final String? notes; // Notes du médecin ou du patient

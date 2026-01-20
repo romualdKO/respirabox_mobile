@@ -10,22 +10,24 @@ import 'cough_analysis_extension.dart';
 class AssemblyAIService {
   static const String _apiKey = 'a4daf92b53b84a198633a77a2c4b8616';
   static const String _uploadUrl = 'https://api.assemblyai.com/v2/upload';
-  static const String _transcriptUrl = 'https://api.assemblyai.com/v2/transcript';
+  static const String _transcriptUrl =
+      'https://api.assemblyai.com/v2/transcript';
 
   /// 📤 Uploader un fichier audio vers AssemblyAI
   Future<String> uploadAudio(String filePath) async {
     try {
       print('🎤 Upload du fichier audio vers AssemblyAI...');
-      
+
       Uint8List bytes;
-      
+
       if (kIsWeb) {
         // Sur web, filePath est un blob URL (blob:http://...)
         // On doit le télécharger pour obtenir les bytes
         print('🌐 Mode web: Téléchargement du blob URL...');
         final blobResponse = await http.get(Uri.parse(filePath));
         if (blobResponse.statusCode != 200) {
-          throw Exception('Impossible de lire le blob audio: ${blobResponse.statusCode}');
+          throw Exception(
+              'Impossible de lire le blob audio: ${blobResponse.statusCode}');
         }
         bytes = blobResponse.bodyBytes;
         print('✅ Blob audio récupéré: ${bytes.length} bytes');
@@ -35,7 +37,7 @@ class AssemblyAIService {
         bytes = await file.readAsBytes();
         print('✅ Fichier audio lu: ${bytes.length} bytes');
       }
-      
+
       // Upload vers AssemblyAI
       final response = await http.post(
         Uri.parse(_uploadUrl),
@@ -52,7 +54,8 @@ class AssemblyAIService {
         print('✅ Fichier uploadé vers AssemblyAI: $uploadUrl');
         return uploadUrl;
       } else {
-        throw Exception('Erreur upload AssemblyAI: ${response.statusCode} - ${response.body}');
+        throw Exception(
+            'Erreur upload AssemblyAI: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       print('❌ Erreur upload audio: $e');
@@ -61,10 +64,11 @@ class AssemblyAIService {
   }
 
   /// 🎯 Transcrire un audio en texte
-  Future<String> transcribeAudio(String audioUrl, {bool analyzeCough = false}) async {
+  Future<String> transcribeAudio(String audioUrl,
+      {bool analyzeCough = false}) async {
     try {
       print('🎤 Lancement de la transcription...');
-      
+
       // Créer la requête de transcription
       final transcriptRequest = {
         'audio_url': audioUrl,
@@ -72,7 +76,7 @@ class AssemblyAIService {
         'punctuate': true,
         'format_text': true,
       };
-      
+
       // Si on veut analyser des sons (toux, respiration)
       if (analyzeCough) {
         transcriptRequest['audio_events_detection'] = true;
@@ -91,11 +95,12 @@ class AssemblyAIService {
         final data = json.decode(response.body);
         final transcriptId = data['id'];
         print('✅ Transcription lancée, ID: $transcriptId');
-        
+
         // Attendre que la transcription soit terminée
         return await _waitForTranscription(transcriptId, analyzeCough);
       } else {
-        throw Exception('Erreur transcription: ${response.statusCode} - ${response.body}');
+        throw Exception(
+            'Erreur transcription: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       print('❌ Erreur transcription: $e');
@@ -104,10 +109,11 @@ class AssemblyAIService {
   }
 
   /// ⏳ Attendre que la transcription soit terminée
-  Future<String> _waitForTranscription(String transcriptId, bool analyzeCough) async {
+  Future<String> _waitForTranscription(
+      String transcriptId, bool analyzeCough) async {
     while (true) {
       await Future.delayed(const Duration(seconds: 2));
-      
+
       final response = await http.get(
         Uri.parse('$_transcriptUrl/$transcriptId'),
         headers: {
@@ -118,21 +124,22 @@ class AssemblyAIService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final status = data['status'];
-        
+
         print('📊 Statut transcription: $status');
-        
+
         if (status == 'completed') {
           final text = data['text'] ?? '';
-          
+
           // Si analyse audio activée
           if (analyzeCough && data['audio_events'] != null) {
             final events = data['audio_events'] as List;
             if (events.isNotEmpty) {
-              final coughEvents = events.where((e) => 
-                e['label'].toString().toLowerCase().contains('cough') ||
-                e['label'].toString().toLowerCase().contains('toux')
-              ).toList();
-              
+              final coughEvents = events
+                  .where((e) =>
+                      e['label'].toString().toLowerCase().contains('cough') ||
+                      e['label'].toString().toLowerCase().contains('toux'))
+                  .toList();
+
               if (coughEvents.isNotEmpty) {
                 return '🔊 ANALYSE AUDIO DÉTECTÉE:\n\n'
                     '⚠️ ${coughEvents.length} événement(s) de toux détecté(s)\n\n'
@@ -140,7 +147,7 @@ class AssemblyAIService {
               }
             }
           }
-          
+
           return text;
         } else if (status == 'error') {
           throw Exception('Erreur transcription: ${data['error']}');
@@ -153,14 +160,16 @@ class AssemblyAIService {
   }
 
   /// 🎤 Transcrire depuis un fichier local
-  Future<String> transcribeFromFile(String filePath, {bool analyzeCough = false}) async {
+  Future<String> transcribeFromFile(String filePath,
+      {bool analyzeCough = false}) async {
     try {
       // 1. Upload le fichier
       final audioUrl = await uploadAudio(filePath);
-      
+
       // 2. Transcrire
-      final transcription = await transcribeAudio(audioUrl, analyzeCough: analyzeCough);
-      
+      final transcription =
+          await transcribeAudio(audioUrl, analyzeCough: analyzeCough);
+
       return transcription;
     } catch (e) {
       print('❌ Erreur transcription depuis fichier: $e');
@@ -172,9 +181,9 @@ class AssemblyAIService {
   Future<Map<String, dynamic>> analyzeCough(String audioFilePath) async {
     try {
       print('🩺 Analyse avancée de la toux...');
-      
+
       final audioUrl = await uploadAudio(audioFilePath);
-      
+
       // Configuration avancée pour analyse audio
       final response = await http.post(
         Uri.parse(_transcriptUrl),
@@ -198,12 +207,12 @@ class AssemblyAIService {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final transcriptId = data['id'];
-        
+
         // Attendre le résultat avec analyse avancée
         print('⏳ Analyse en cours (ID: $transcriptId)...');
         while (true) {
           await Future.delayed(const Duration(seconds: 2));
-          
+
           final result = await http.get(
             Uri.parse('$_transcriptUrl/$transcriptId'),
             headers: {'authorization': _apiKey},
@@ -211,31 +220,52 @@ class AssemblyAIService {
 
           if (result.statusCode == 200) {
             final resultData = json.decode(result.body);
-            
+
             if (resultData['status'] == 'completed') {
               print('✅ Analyse terminée');
-              
+              print('📊 Text transcrit: "${resultData['text']}"');
+              print('📊 Confiance: ${resultData['confidence']}');
+              print('📊 Durée: ${resultData['audio_duration']}s');
+
               final text = resultData['text'] ?? '';
               final confidence = resultData['confidence'] ?? 0.0;
               final duration = resultData['audio_duration'] ?? 0.0;
-              
+
+              // SI aucun texte transcrit mais durée > 1s, c'est probablement une toux
+              final hasCoughBasedOnDuration = text.isEmpty && duration > 1.0;
+
               // Analyse intelligente de la toux avec scoring médical
               final coughAnalysis = CoughAnalysisHelper.analyzeCoughPattern(
-                text, 
-                duration, 
-                confidence
-              );
-              
+                  text.isEmpty
+                      ? 'son non-verbal toux'
+                      : text, // Si vide, forcer détection
+                  duration,
+                  confidence);
+
+              // Override si basé sur durée uniquement
+              if (hasCoughBasedOnDuration) {
+                coughAnalysis['hasCough'] = true;
+                if (coughAnalysis['frequency'] == 0) {
+                  coughAnalysis['frequency'] =
+                      (duration / 2).ceil(); // Estimer 1 toux par 2 secondes
+                }
+              }
+
               return {
                 'status': 'completed',
-                'hasCough': coughAnalysis['hasCough'],
-                'text': text.isEmpty ? '[Son non-verbal - toux détectée]' : text,
+                'hasCough':
+                    coughAnalysis['hasCough'] || hasCoughBasedOnDuration,
+                'text': text.isEmpty
+                    ? '[Son non-verbal - ${hasCoughBasedOnDuration ? "toux détectée" : "audio inaudible"}]'
+                    : text,
                 'confidence': confidence,
                 'duration': duration,
                 // Résultats d'analyse médicale
                 'coughType': coughAnalysis['type'], // sèche, productive, grasse
-                'intensity': coughAnalysis['intensity'], // légère, modérée, sévère
-                'frequency': coughAnalysis['frequency'], // nombre estimé de toux
+                'intensity':
+                    coughAnalysis['intensity'], // légère, modérée, sévère
+                'frequency':
+                    coughAnalysis['frequency'], // nombre estimé de toux
                 'tuberculosisRisk': coughAnalysis['tbRisk'], // 0-100
                 'pneumoniaRisk': coughAnalysis['pneumoniaRisk'], // 0-100
                 'recommendation': coughAnalysis['recommendation'],
@@ -247,7 +277,8 @@ class AssemblyAIService {
           }
         }
       } else {
-        throw Exception('Erreur requête: ${response.statusCode} - ${response.body}');
+        throw Exception(
+            'Erreur requête: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       print('❌ Erreur analyse toux: $e');

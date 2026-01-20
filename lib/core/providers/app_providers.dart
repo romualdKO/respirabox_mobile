@@ -49,19 +49,22 @@ final testServiceProvider = Provider<TestService>((ref) {
 });
 
 /// Liste des tests de l'utilisateur
-final userTestsProvider = StreamProvider.family<List<TestResultModel>, String>((ref, userId) {
+final userTestsProvider =
+    StreamProvider.family<List<TestResultModel>, String>((ref, userId) {
   final testService = ref.watch(testServiceProvider);
   return testService.watchUserTests(userId);
 });
 
 /// Tests récents (limite 30)
-final recentTestsProvider = FutureProvider.family<List<TestResultModel>, String>((ref, userId) async {
+final recentTestsProvider =
+    FutureProvider.family<List<TestResultModel>, String>((ref, userId) async {
   final testService = ref.watch(testServiceProvider);
   return await testService.getRecentTests(userId, limit: 30);
 });
 
 /// Statistiques de l'utilisateur
-final userStatsProvider = FutureProvider.family<Map<String, dynamic>, String>((ref, userId) async {
+final userStatsProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, userId) async {
   final testService = ref.watch(testServiceProvider);
   final stats = await testService.getUserStatistics(userId);
   return {
@@ -73,7 +76,8 @@ final userStatsProvider = FutureProvider.family<Map<String, dynamic>, String>((r
 });
 
 /// Test spécifique par ID
-final testByIdProvider = FutureProvider.family<TestResultModel?, String>((ref, testId) async {
+final testByIdProvider =
+    FutureProvider.family<TestResultModel?, String>((ref, testId) async {
   final testService = ref.watch(testServiceProvider);
   return await testService.getTestById(testId);
 });
@@ -88,20 +92,24 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 });
 
 /// Notifications de l'utilisateur
-final userNotificationsProvider = FutureProvider.family<List<NotificationModel>, String>((ref, userId) async {
+final userNotificationsProvider =
+    FutureProvider.family<List<NotificationModel>, String>((ref, userId) async {
   final notificationService = ref.watch(notificationServiceProvider);
   return await notificationService.getUserNotifications(userId);
 });
 
 /// Notifications non lues
-final unreadNotificationsProvider = FutureProvider.family<List<NotificationModel>, String>((ref, userId) async {
+final unreadNotificationsProvider =
+    FutureProvider.family<List<NotificationModel>, String>((ref, userId) async {
   final notificationService = ref.watch(notificationServiceProvider);
   return await notificationService.getUnreadNotifications(userId);
 });
 
 /// Nombre de notifications non lues
-final unreadCountProvider = FutureProvider.family<int, String>((ref, userId) async {
-  final unreadNotifications = await ref.watch(unreadNotificationsProvider(userId).future);
+final unreadCountProvider =
+    FutureProvider.family<int, String>((ref, userId) async {
+  final unreadNotifications =
+      await ref.watch(unreadNotificationsProvider(userId).future);
   return unreadNotifications.length;
 });
 

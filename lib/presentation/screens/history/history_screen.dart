@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../data/models/test_result_model.dart';
 
 /// 📜 ÉCRAN D'HISTORIQUE DES TESTS
 /// Affiche tous les tests effectués avec filtres et recherche
@@ -41,9 +42,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             final filteredTests = _selectedFilter == 'Tous'
                 ? allTests
                 : allTests.where((test) {
-                    final riskText = test.riskLevel == 'low'
+                    final riskText = test.riskLevel == RiskLevel.low
                         ? 'Faible'
-                        : test.riskLevel == 'moderate'
+                        : test.riskLevel == RiskLevel.medium
                             ? 'Moyen'
                             : 'Élevé';
                     return riskText == _selectedFilter;
@@ -189,7 +190,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         .round();
 
     final lowRiskCount =
-        tests.where((t) => t.riskLevel == 'low').length;
+        tests.where((t) => t.riskLevel == RiskLevel.low).length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -390,21 +391,22 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   }
 
   Widget _buildTestCardFromModel(dynamic test) {
-    final riskColor = test.riskLevel == 'low'
+    final riskColor = test.riskLevel == RiskLevel.low
         ? AppColors.success
-        : test.riskLevel == 'moderate'
+        : test.riskLevel == RiskLevel.medium
             ? AppColors.warning
             : AppColors.error;
 
-    final riskText = test.riskLevel == 'low'
+    final riskText = test.riskLevel == RiskLevel.low
         ? 'Faible'
-        : test.riskLevel == 'moderate'
+        : test.riskLevel == RiskLevel.medium
             ? 'Moyen'
             : 'Élevé';
 
     final date = test.testDate;
     final dateStr = '${date.day} ${_getMonthName(date.month)} ${date.year}';
-    final timeStr = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    final timeStr =
+        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -516,8 +518,18 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
   String _getMonthName(int month) {
     const months = [
-      'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
-      'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'
+      'Jan',
+      'Fév',
+      'Mar',
+      'Avr',
+      'Mai',
+      'Juin',
+      'Juil',
+      'Août',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Déc'
     ];
     return months[month - 1];
   }
@@ -659,7 +671,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   const SizedBox(height: 20),
                   Text('Détails du test', style: AppTextStyles.h2),
                   const SizedBox(height: 20),
-                  
+
                   // Score de risque
                   Container(
                     width: double.infinity,
@@ -691,7 +703,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Date et heure
                   _buildDetailRow(
                     Icons.calendar_today,
@@ -699,7 +711,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     '${test['date']} à ${test['time']}',
                   ),
                   const Divider(height: 30),
-                  
+
                   // Métriques
                   Text('Mesures', style: AppTextStyles.h3),
                   const SizedBox(height: 15),
@@ -721,7 +733,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                     '${test['temperature']}°C',
                   ),
                   const SizedBox(height: 30),
-                  
+
                   // Actions
                   SizedBox(
                     width: double.infinity,

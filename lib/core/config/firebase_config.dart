@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 /// 🔥 CONFIGURATION FIREBASE RESPIRABOX
 /// Utilise les fichiers google-services.json (Android) et GoogleService-Info.plist (iOS)

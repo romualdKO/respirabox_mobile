@@ -43,6 +43,9 @@ dependencies:
   dio: ^5.4.0
   google_generative_ai: ^0.4.0
   
+  # 🌍 Géolocalisation pour API météo
+  geolocator: ^10.1.0
+  
   # 📊 Charts & Graphiques
   fl_chart: ^0.65.0
   # syncfusion_flutter_charts: ^24.1.41 # Temporairement désactivé - conflit avec intl
@@ -59,10 +62,10 @@ dependencies:
   # 🔐 Permissions
   permission_handler: ^11.1.0
   
-  # 🎤 Audio Recording
-  record: ^5.0.4
+  # 🎤 Audio Recording (flutter_sound - alternative stable)
+  flutter_sound: ^9.2.13
   
-  # � Storage
+  # 📦 Storage
   firebase_storage: ^12.4.10
   
   # �🛠️ Utilitaires
@@ -72,6 +75,8 @@ dependencies:
   uuid: ^4.2.2
   equatable: ^2.0.5
 
+# dependency_overrides supprimés - migration vers flutter_sound
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -103,8 +103,7 @@ class ConversationModel {
   }
 
   /// Dernier message de la conversation
-  MessageModel? get lastMessage =>
-      messages.isNotEmpty ? messages.last : null;
+  MessageModel? get lastMessage => messages.isNotEmpty ? messages.last : null;
 
   /// Aperçu du dernier message (50 premiers caractères)
   String get lastMessagePreview {

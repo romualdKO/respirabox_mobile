@@ -26,10 +26,8 @@ class FirestoreService {
   /// 📖 RÉCUPÉRER UN RÉSULTAT DE TEST PAR ID
   Future<TestResultModel?> getTestResult(String testId) async {
     try {
-      final doc = await _firestore
-          .collection(testsCollection)
-          .doc(testId)
-          .get();
+      final doc =
+          await _firestore.collection(testsCollection).doc(testId).get();
 
       if (doc.exists) {
         return TestResultModel.fromFirestore(doc);
@@ -70,12 +68,10 @@ class FirestoreService {
   }
 
   /// ✏️ METTRE À JOUR UN RÉSULTAT DE TEST
-  Future<void> updateTestResult(String testId, Map<String, dynamic> updates) async {
+  Future<void> updateTestResult(
+      String testId, Map<String, dynamic> updates) async {
     try {
-      await _firestore
-          .collection(testsCollection)
-          .doc(testId)
-          .update({
+      await _firestore.collection(testsCollection).doc(testId).update({
         ...updates,
         'updatedAt': Timestamp.now(),
       });
@@ -87,10 +83,7 @@ class FirestoreService {
   /// 🗑️ SUPPRIMER UN RÉSULTAT DE TEST
   Future<void> deleteTestResult(String testId) async {
     try {
-      await _firestore
-          .collection(testsCollection)
-          .doc(testId)
-          .delete();
+      await _firestore.collection(testsCollection).doc(testId).delete();
     } catch (e) {
       throw 'Erreur lors de la suppression du test: $e';
     }
@@ -100,7 +93,7 @@ class FirestoreService {
   Future<Map<String, dynamic>> getUserStatistics(String userId) async {
     try {
       final tests = await getUserTests(userId);
-      
+
       if (tests.isEmpty) {
         return {
           'totalTests': 0,
@@ -114,20 +107,16 @@ class FirestoreService {
 
       // Calculs statistiques
       final totalTests = tests.length;
-      final averageRiskScore = tests
-          .map((t) => t.riskScore)
-          .reduce((a, b) => a + b) / totalTests;
+      final averageRiskScore =
+          tests.map((t) => t.riskScore).reduce((a, b) => a + b) / totalTests;
       final lastTestDate = tests.first.testDate;
-      
-      final highRiskCount = tests
-          .where((t) => t.riskLevel == RiskLevel.high)
-          .length;
-      final mediumRiskCount = tests
-          .where((t) => t.riskLevel == RiskLevel.medium)
-          .length;
-      final lowRiskCount = tests
-          .where((t) => t.riskLevel == RiskLevel.low)
-          .length;
+
+      final highRiskCount =
+          tests.where((t) => t.riskLevel == RiskLevel.high).length;
+      final mediumRiskCount =
+          tests.where((t) => t.riskLevel == RiskLevel.medium).length;
+      final lowRiskCount =
+          tests.where((t) => t.riskLevel == RiskLevel.low).length;
 
       return {
         'totalTests': totalTests,
@@ -155,20 +144,22 @@ class FirestoreService {
           .where('userId', isEqualTo: userId);
 
       if (riskLevel != null) {
-        query = query.where('riskLevel', isEqualTo: riskLevel.toString().split('.').last);
+        query = query.where('riskLevel',
+            isEqualTo: riskLevel.toString().split('.').last);
       }
 
       if (startDate != null) {
-        query = query.where('testDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+        query = query.where('testDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
       }
 
       if (endDate != null) {
-        query = query.where('testDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+        query = query.where('testDate',
+            isLessThanOrEqualTo: Timestamp.fromDate(endDate));
       }
 
-      final querySnapshot = await query
-          .orderBy('testDate', descending: true)
-          .get();
+      final querySnapshot =
+          await query.orderBy('testDate', descending: true).get();
 
       return querySnapshot.docs
           .map((doc) => TestResultModel.fromFirestore(doc))
@@ -196,10 +187,7 @@ class FirestoreService {
   /// 📤 PARTAGER UN TEST AVEC UN MÉDECIN
   Future<void> shareTestWithDoctor(String testId, bool share) async {
     try {
-      await _firestore
-          .collection(testsCollection)
-          .doc(testId)
-          .update({
+      await _firestore.collection(testsCollection).doc(testId).update({
         'isSharedWithDoctor': share,
         'updatedAt': Timestamp.now(),
       });

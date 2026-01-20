@@ -30,7 +30,7 @@ class AuthService {
   }) async {
     try {
       // 1. Créer le compte Firebase Auth sans paramètres optionnels
-      final UserCredential userCredential = 
+      final UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -75,7 +75,7 @@ class AuthService {
   }) async {
     try {
       // 1. Se connecter avec Firebase Auth sans paramètres optionnels
-      final UserCredential userCredential = 
+      final UserCredential userCredential =
           await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -126,14 +126,15 @@ class AuthService {
     try {
       // 1. Déclencher le flux d'authentification Google
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      
+
       if (googleUser == null) {
         // L'utilisateur a annulé la connexion
         return null;
       }
 
       // 2. Obtenir les détails d'authentification
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       // 3. Créer les credentials Firebase
       final credential = GoogleAuthProvider.credential(
@@ -142,17 +143,15 @@ class AuthService {
       );
 
       // 4. Se connecter à Firebase avec les credentials Google
-      final UserCredential userCredential = 
+      final UserCredential userCredential =
           await _auth.signInWithCredential(credential);
 
       if (userCredential.user != null) {
         final firebaseUser = userCredential.user!;
-        
+
         // 5. Vérifier si l'utilisateur existe déjà dans Firestore
-        final userDoc = await _firestore
-            .collection('users')
-            .doc(firebaseUser.uid)
-            .get();
+        final userDoc =
+            await _firestore.collection('users').doc(firebaseUser.uid).get();
 
         if (userDoc.exists) {
           // Utilisateur existant, récupérer ses données
@@ -163,7 +162,8 @@ class AuthService {
           final newUser = UserModel(
             id: firebaseUser.uid,
             firstName: nameParts.isNotEmpty ? nameParts[0] : 'Utilisateur',
-            lastName: nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
+            lastName:
+                nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
             email: firebaseUser.email ?? googleUser.email,
             phoneNumber: firebaseUser.phoneNumber,
             gender: 'other',
@@ -197,10 +197,8 @@ class AuthService {
       final user = _auth.currentUser;
       if (user == null) return null;
 
-      final docSnapshot = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final docSnapshot =
+          await _firestore.collection('users').doc(user.uid).get();
 
       if (docSnapshot.exists) {
         return UserModel.fromFirestore(docSnapshot);

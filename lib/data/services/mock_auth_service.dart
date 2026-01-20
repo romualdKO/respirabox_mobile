@@ -77,11 +77,11 @@ class MockAuthService {
   /// 🔄 RÉINITIALISATION DU MOT DE PASSE MOCK
   Future<void> sendPasswordResetEmail(String email) async {
     await Future.delayed(const Duration(seconds: 1));
-    
+
     if (!_users.any((u) => u['email'] == email)) {
       throw 'Aucun compte trouvé avec cet email';
     }
-    
+
     // Simuler l'envoi d'email
     print('📧 Email de réinitialisation envoyé à: $email');
   }
@@ -136,7 +136,7 @@ class MockAuthService {
   /// 🗑️ SUPPRIMER LE COMPTE
   Future<void> deleteAccount() async {
     await Future.delayed(const Duration(seconds: 1));
-    
+
     if (_currentUser != null) {
       _users.removeWhere((u) => u['user'].id == _currentUser!.id);
       _currentUser = null;

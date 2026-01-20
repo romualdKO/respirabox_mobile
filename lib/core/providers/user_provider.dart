@@ -11,7 +11,8 @@ final authServiceProvider = Provider<AuthService>((ref) {
 });
 
 // Provider UserModel (utilisateur connecté)
-final currentUserProvider = StateNotifierProvider<UserNotifier, AsyncValue<UserModel?>>((ref) {
+final currentUserProvider =
+    StateNotifierProvider<UserNotifier, AsyncValue<UserModel?>>((ref) {
   return UserNotifier(ref.read(authServiceProvider));
 });
 

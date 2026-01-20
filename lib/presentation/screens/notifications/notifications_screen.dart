@@ -49,7 +49,8 @@ class NotificationsScreen extends ConsumerWidget {
                     if (unreadCount > 0)
                       Text(
                         '$unreadCount non lue${unreadCount > 1 ? 's' : ''}',
-                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary),
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: AppColors.primary),
                       ),
                   ],
                 ),
@@ -57,7 +58,8 @@ class NotificationsScreen extends ConsumerWidget {
                   if (notifications.isNotEmpty && unreadCount > 0)
                     TextButton(
                       onPressed: () async {
-                        for (var notif in notifications.where((n) => !n.isRead)) {
+                        for (var notif
+                            in notifications.where((n) => !n.isRead)) {
                           await NotificationService().markAsRead(notif.id);
                         }
                       },
@@ -65,12 +67,15 @@ class NotificationsScreen extends ConsumerWidget {
                     ),
                   if (notifications.isNotEmpty)
                     PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert, color: AppColors.textDark),
+                      icon: const Icon(Icons.more_vert,
+                          color: AppColors.textDark),
                       onSelected: (value) async {
                         if (value == 'clear') {
-                          final notifs = await NotificationService().getUserNotifications(user.id);
+                          final notifs = await NotificationService()
+                              .getUserNotifications(user.id);
                           for (var n in notifs) {
-                            await NotificationService().deleteNotification(n.id);
+                            await NotificationService()
+                                .deleteNotification(n.id);
                           }
                         }
                       },
@@ -88,9 +93,12 @@ class NotificationsScreen extends ConsumerWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.notifications_none_outlined, size: 80, color: Colors.grey[300]),
+                          Icon(Icons.notifications_none_outlined,
+                              size: 80, color: Colors.grey[300]),
                           const SizedBox(height: 16),
-                          Text('Aucune notification', style: AppTextStyles.h3.copyWith(color: Colors.grey[400])),
+                          Text('Aucune notification',
+                              style: AppTextStyles.h3
+                                  .copyWith(color: Colors.grey[400])),
                         ],
                       ),
                     )
@@ -106,15 +114,20 @@ class NotificationsScreen extends ConsumerWidget {
                             color: AppColors.error,
                             alignment: Alignment.centerRight,
                             padding: const EdgeInsets.only(right: 20),
-                            child: const Icon(Icons.delete, color: Colors.white),
+                            child:
+                                const Icon(Icons.delete, color: Colors.white),
                           ),
                           onDismissed: (_) async {
-                            await NotificationService().deleteNotification(notif.id);
+                            await NotificationService()
+                                .deleteNotification(notif.id);
                           },
                           child: Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
                             decoration: BoxDecoration(
-                              color: notif.isRead ? Colors.white : AppColors.primary.withOpacity(0.05),
+                              color: notif.isRead
+                                  ? Colors.white
+                                  : AppColors.primary.withOpacity(0.05),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.grey[200]!),
                             ),
@@ -123,7 +136,8 @@ class NotificationsScreen extends ConsumerWidget {
                               leading: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: _getTypeColor(notif.type).withOpacity(0.1),
+                                  color: _getTypeColor(notif.type)
+                                      .withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
@@ -138,7 +152,9 @@ class NotificationsScreen extends ConsumerWidget {
                                     child: Text(
                                       notif.title,
                                       style: AppTextStyles.h4.copyWith(
-                                        fontWeight: notif.isRead ? FontWeight.normal : FontWeight.bold,
+                                        fontWeight: notif.isRead
+                                            ? FontWeight.normal
+                                            : FontWeight.bold,
                                       ),
                                     ),
                                   ),
@@ -157,14 +173,19 @@ class NotificationsScreen extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const SizedBox(height: 4),
-                                  Text(notif.message, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textLight)),
+                                  Text(notif.message,
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                          color: AppColors.textLight)),
                                   const SizedBox(height: 8),
-                                  Text(_formatTime(notif.createdAt), style: AppTextStyles.bodySmall.copyWith(color: Colors.grey[400])),
+                                  Text(_formatTime(notif.createdAt),
+                                      style: AppTextStyles.bodySmall
+                                          .copyWith(color: Colors.grey[400])),
                                 ],
                               ),
                               onTap: () async {
                                 if (!notif.isRead) {
-                                  await NotificationService().markAsRead(notif.id);
+                                  await NotificationService()
+                                      .markAsRead(notif.id);
                                 }
                               },
                             ),
@@ -183,21 +204,31 @@ class NotificationsScreen extends ConsumerWidget {
 
   IconData _getTypeIcon(NotificationType type) {
     switch (type) {
-      case NotificationType.testComplete: return Icons.check_circle_outline;
-      case NotificationType.reminder: return Icons.alarm;
-      case NotificationType.alert: return Icons.warning_amber_rounded;
-      case NotificationType.success: return Icons.check_circle;
-      default: return Icons.info_outline;
+      case NotificationType.testComplete:
+        return Icons.check_circle_outline;
+      case NotificationType.reminder:
+        return Icons.alarm;
+      case NotificationType.alert:
+        return Icons.warning_amber_rounded;
+      case NotificationType.success:
+        return Icons.check_circle;
+      default:
+        return Icons.info_outline;
     }
   }
 
   Color _getTypeColor(NotificationType type) {
     switch (type) {
-      case NotificationType.testComplete: return AppColors.primary;
-      case NotificationType.reminder: return Colors.blue;
-      case NotificationType.alert: return AppColors.warning;
-      case NotificationType.success: return AppColors.success;
-      default: return Colors.purple;
+      case NotificationType.testComplete:
+        return AppColors.primary;
+      case NotificationType.reminder:
+        return Colors.blue;
+      case NotificationType.alert:
+        return AppColors.warning;
+      case NotificationType.success:
+        return AppColors.success;
+      default:
+        return Colors.purple;
     }
   }
 

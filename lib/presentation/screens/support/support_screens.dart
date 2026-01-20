@@ -83,8 +83,7 @@ class HelpScreen extends StatelessWidget {
         ),
         ContentSection(
           title: 'Comment effectuer un test ?',
-          content:
-              '1. Connectez-vous à l\'application\n'
+          content: '1. Connectez-vous à l\'application\n'
               '2. Appuyez sur "Scanner" pour détecter votre boîtier RespiraBox\n'
               '3. Suivez les instructions de préparation\n'
               '4. Respirez normalement pendant 30 secondes\n'
@@ -92,15 +91,13 @@ class HelpScreen extends StatelessWidget {
         ),
         ContentSection(
           title: 'Que signifient mes résultats ?',
-          content:
-              '• Score Faible: Vos paramètres respiratoires sont normaux\n'
+          content: '• Score Faible: Vos paramètres respiratoires sont normaux\n'
               '• Score Moyen: Certains paramètres nécessitent une surveillance\n'
               '• Score Élevé: Consultez un professionnel de santé rapidement',
         ),
         ContentSection(
           title: 'Questions fréquentes',
-          content:
-              'Q: À quelle fréquence dois-je faire un test ?\n'
+          content: 'Q: À quelle fréquence dois-je faire un test ?\n'
               'R: Nous recommandons un test hebdomadaire pour un suivi optimal.\n\n'
               'Q: Mes données sont-elles sécurisées ?\n'
               'R: Oui, toutes vos données sont chiffrées et stockées de manière sécurisée.\n\n'
@@ -109,8 +106,7 @@ class HelpScreen extends StatelessWidget {
         ),
         ContentSection(
           title: 'Besoin d\'aide supplémentaire ?',
-          content:
-              'Contactez notre équipe support:\n'
+          content: 'Contactez notre équipe support:\n'
               '📧 Email: support@respirabox.ci\n'
               '📞 Téléphone: +225 XX XX XX XX XX\n'
               '🕐 Horaires: Lun-Ven 8h-18h',
@@ -130,15 +126,13 @@ class PrivacyScreen extends StatelessWidget {
       title: 'Politique de confidentialité',
       sections: [
         ContentSection(
-          content:
-              'Dernière mise à jour: 16 décembre 2025\n\n'
+          content: 'Dernière mise à jour: 16 décembre 2025\n\n'
               'RespiraBox s\'engage à protéger votre vie privée et vos données personnelles. '
               'Cette politique explique comment nous collectons, utilisons et protégeons vos informations.',
         ),
         ContentSection(
           title: '1. Données collectées',
-          content:
-              'Nous collectons les informations suivantes:\n'
+          content: 'Nous collectons les informations suivantes:\n'
               '• Informations de profil (nom, email, téléphone)\n'
               '• Données de tests respiratoires (SpO2, fréquence cardiaque, température)\n'
               '• Historique des tests et résultats\n'
@@ -146,8 +140,7 @@ class PrivacyScreen extends StatelessWidget {
         ),
         ContentSection(
           title: '2. Utilisation des données',
-          content:
-              'Vos données sont utilisées pour:\n'
+          content: 'Vos données sont utilisées pour:\n'
               '• Fournir nos services de dépistage\n'
               '• Améliorer votre expérience utilisateur\n'
               '• Vous envoyer des notifications importantes\n'
@@ -156,8 +149,7 @@ class PrivacyScreen extends StatelessWidget {
         ),
         ContentSection(
           title: '3. Protection des données',
-          content:
-              'Nous mettons en œuvre des mesures de sécurité strictes:\n'
+          content: 'Nous mettons en œuvre des mesures de sécurité strictes:\n'
               '• Chiffrement de bout en bout\n'
               '• Serveurs sécurisés certifiés\n'
               '• Accès restreint aux données médicales\n'
@@ -165,8 +157,7 @@ class PrivacyScreen extends StatelessWidget {
         ),
         ContentSection(
           title: '4. Vos droits',
-          content:
-              'Vous avez le droit de:\n'
+          content: 'Vous avez le droit de:\n'
               '• Accéder à vos données personnelles\n'
               '• Corriger ou supprimer vos informations\n'
               '• Vous opposer au traitement de vos données\n'
@@ -184,8 +175,7 @@ class PrivacyScreen extends StatelessWidget {
         ),
         ContentSection(
           title: '6. Contact',
-          content:
-              'Pour toute question sur cette politique:\n'
+          content: 'Pour toute question sur cette politique:\n'
               'Email: privacy@respirabox.ci\n'
               'Adresse: Abidjan, Côte d\'Ivoire',
         ),
@@ -204,8 +194,7 @@ class TermsScreen extends StatelessWidget {
       title: 'Conditions d\'utilisation',
       sections: [
         ContentSection(
-          content:
-              'Dernière mise à jour: 16 décembre 2025\n\n'
+          content: 'Dernière mise à jour: 16 décembre 2025\n\n'
               'En utilisant RespiraBox, vous acceptez les présentes conditions d\'utilisation.',
         ),
         ContentSection(
@@ -216,8 +205,7 @@ class TermsScreen extends StatelessWidget {
         ),
         ContentSection(
           title: '2. Utilisation du service',
-          content:
-              'Vous vous engagez à:\n'
+          content: 'Vous vous engagez à:\n'
               '• Fournir des informations exactes lors de l\'inscription\n'
               '• Garder vos identifiants confidentiels\n'
               '• Utiliser le service conformément aux instructions\n'
@@ -226,8 +214,7 @@ class TermsScreen extends StatelessWidget {
         ),
         ContentSection(
           title: '3. Responsabilités',
-          content:
-              'RespiraBox s\'engage à:\n'
+          content: 'RespiraBox s\'engage à:\n'
               '• Fournir un service de qualité\n'
               '• Protéger vos données personnelles\n'
               '• Maintenir la disponibilité du service\n'
@@ -239,8 +226,7 @@ class TermsScreen extends StatelessWidget {
         ),
         ContentSection(
           title: '4. Avertissement médical',
-          content:
-              '⚠️ IMPORTANT:\n'
+          content: '⚠️ IMPORTANT:\n'
               '• RespiraBox est un outil de dépistage, pas de diagnostic\n'
               '• Consultez toujours un médecin en cas de symptômes\n'
               '• Ne modifiez pas votre traitement sans avis médical\n'
@@ -266,8 +252,7 @@ class TermsScreen extends StatelessWidget {
         ),
         ContentSection(
           title: '8. Droit applicable',
-          content:
-              'Ces conditions sont régies par le droit ivoirien. '
+          content: 'Ces conditions sont régies par le droit ivoirien. '
               'Tout litige sera soumis aux tribunaux compétents d\'Abidjan.',
         ),
       ],
@@ -367,8 +352,7 @@ class AboutScreen extends StatelessWidget {
             _buildInfoCard(
               icon: Icons.email,
               title: 'Contact',
-              content:
-                  '📧 support@respirabox.ci\n'
+              content: '📧 support@respirabox.ci\n'
                   '📞 +225 XX XX XX XX XX\n'
                   '🌐 www.respirabox.ci\n'
                   '📍 Abidjan, Côte d\'Ivoire',

@@ -5,7 +5,7 @@ import '../models/test_result_model.dart';
 /// Gère la sauvegarde, la récupération et la synchronisation des tests avec Firestore
 class TestService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   /// Collection Firestore des tests
   CollectionReference get _testsCollection => _firestore.collection('tests');
 
@@ -38,7 +38,7 @@ class TestService {
   Future<TestResultModel?> getTestById(String testId) async {
     try {
       final doc = await _testsCollection.doc(testId).get();
-      
+
       if (doc.exists) {
         return TestResultModel.fromFirestore(doc);
       }
@@ -67,7 +67,8 @@ class TestService {
   }
 
   /// 📊 RÉCUPÉRER LES DERNIERS TESTS
-  Future<List<TestResultModel>> getRecentTests(String userId, {int limit = 5}) async {
+  Future<List<TestResultModel>> getRecentTests(String userId,
+      {int limit = 5}) async {
     try {
       final querySnapshot = await _testsCollection
           .where('userId', isEqualTo: userId)
@@ -92,7 +93,8 @@ class TestService {
     try {
       final querySnapshot = await _testsCollection
           .where('userId', isEqualTo: userId)
-          .where('testDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+          .where('testDate',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('testDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
           .orderBy('testDate', descending: true)
           .get();
@@ -120,7 +122,7 @@ class TestService {
   Future<TestStatistics> getUserStatistics(String userId) async {
     try {
       final tests = await getUserTests(userId);
-      
+
       if (tests.isEmpty) {
         return TestStatistics(
           totalTests: 0,
@@ -131,9 +133,10 @@ class TestService {
       }
 
       final totalTests = tests.length;
-      final averageScore = tests.map((t) => t.riskScore).reduce((a, b) => a + b) / totalTests;
+      final averageScore =
+          tests.map((t) => t.riskScore).reduce((a, b) => a + b) / totalTests;
       final lastTestDate = tests.first.testDate;
-      
+
       // Calcul du taux d'amélioration (comparison premier vs dernier test)
       double improvementRate = 0;
       if (tests.length >= 2) {

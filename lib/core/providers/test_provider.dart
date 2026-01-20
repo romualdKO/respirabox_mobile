@@ -11,25 +11,29 @@ final testServiceProvider = Provider<TestService>((ref) {
 });
 
 // Provider liste des tests utilisateur
-final userTestsProvider = StreamProvider.autoDispose.family<List<TestResult>, String>((ref, userId) {
+final userTestsProvider =
+    StreamProvider.autoDispose.family<List<TestResult>, String>((ref, userId) {
   final testService = ref.watch(testServiceProvider);
   return testService.watchUserTests(userId);
 });
 
 // Provider tests récents (dernier mois)
-final recentTestsProvider = FutureProvider.autoDispose.family<List<TestResult>, String>((ref, userId) async {
+final recentTestsProvider = FutureProvider.autoDispose
+    .family<List<TestResult>, String>((ref, userId) async {
   final testService = ref.watch(testServiceProvider);
   return testService.getRecentTests(userId, limit: 10);
 });
 
 // Provider statistiques utilisateur
-final userStatsProvider = FutureProvider.autoDispose.family<Map<String, dynamic>, String>((ref, userId) async {
+final userStatsProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, String>((ref, userId) async {
   final testService = ref.watch(testServiceProvider);
   return testService.getUserStatistics(userId);
 });
 
 // Provider test par ID
-final testByIdProvider = FutureProvider.autoDispose.family<TestResult?, String>((ref, testId) async {
+final testByIdProvider =
+    FutureProvider.autoDispose.family<TestResult?, String>((ref, testId) async {
   final testService = ref.watch(testServiceProvider);
   return testService.getTestById(testId);
 });

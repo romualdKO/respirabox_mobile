@@ -27,7 +27,8 @@ class ConversationService {
         'isActive': true,
       };
 
-      final docRef = await _firestore.collection('conversations').add(conversationData);
+      final docRef =
+          await _firestore.collection('conversations').add(conversationData);
 
       return ConversationModel(
         id: docRef.id,

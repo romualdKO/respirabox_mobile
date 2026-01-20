@@ -11,18 +11,18 @@ import 'routes/app_routes.dart';
 void main() async {
   // ✅ Initialisation des services Flutter
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // 🔥 Initialisation de Firebase
   await Firebase.initializeApp(
     options: FirebaseConfig.firebaseOptions,
   );
-  
+
   // 📱 Configuration de l'orientation (portrait uniquement)
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  
+
   // 🎨 Configuration de la barre de statut
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -30,7 +30,7 @@ void main() async {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  
+
   // 🚀 Lancement de l'application avec Riverpod
   runApp(
     const ProviderScope(
@@ -49,16 +49,16 @@ class RespiraBoxApp extends StatelessWidget {
       // 📝 Configuration de l'application
       title: 'RespiraBox',
       debugShowCheckedModeBanner: false, // Masquer le bandeau "DEBUG"
-      
+
       // 🎨 Thème
       theme: ThemeConfig.lightTheme,
       darkTheme: ThemeConfig.darkTheme,
       themeMode: ThemeMode.light, // Mode clair par défaut
-      
+
       // 🧭 Navigation
       initialRoute: AppRoutes.splash, // Démarre sur le splash screen
       onGenerateRoute: AppRoutes.generateRoute,
-      
+
       // 🌍 Localisation (français)
       locale: const Locale('fr', 'FR'),
       supportedLocales: const [

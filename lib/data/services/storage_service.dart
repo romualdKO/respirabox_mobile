@@ -6,7 +6,6 @@ import 'package:path_provider/path_provider.dart';
 /// Gère la sauvegarde locale de fichiers (audio, images, PDF)
 /// Alternative à Firebase Storage pour le mode Spark (gratuit)
 class StorageService {
-  
   /// Obtenir le répertoire de stockage de l'app
   Future<Directory> get _appDirectory async {
     return await getApplicationDocumentsDirectory();
@@ -20,21 +19,22 @@ class StorageService {
   }) async {
     try {
       final appDir = await _appDirectory;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(audioFile.path)}';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${path.basename(audioFile.path)}';
       final testDir = Directory('${appDir.path}/audio_tests/$userId/$testId');
-      
+
       // Créer le dossier si nécessaire
       if (!await testDir.exists()) {
         await testDir.create(recursive: true);
       }
-      
+
       // Copier le fichier audio
       final savedFile = File('${testDir.path}/$fileName');
       await audioFile.copy(savedFile.path);
 
       // Attendre la fin de l'upload
       final snapshot = await uploadTask;
-      
+
       // Récupérer l'URL de téléchargement
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
@@ -49,7 +49,8 @@ class StorageService {
     required File imageFile,
   }) async {
     try {
-      final fileName = 'profile_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName =
+          'profile_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = _storage.ref().child('profile_images/$userId/$fileName');
 
       final uploadTask = ref.putFile(
@@ -77,7 +78,8 @@ class StorageService {
     required String testId,
   }) async {
     try {
-      final fileName = 'report_${testId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final fileName =
+          'report_${testId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
       final ref = _storage.ref().child('pdf_reports/$userId/$testId/$fileName');
 
       final uploadTask = ref.putFile(
@@ -140,13 +142,13 @@ class StorageService {
     try {
       final ref = _storage.ref().child('$folder/$userId');
       final result = await ref.listAll();
-      
+
       final urls = <String>[];
       for (var item in result.items) {
         final url = await item.getDownloadURL();
         urls.add(url);
       }
-      
+
       return urls;
     } catch (e) {
       throw 'Erreur lors du listage des fichiers: $e';

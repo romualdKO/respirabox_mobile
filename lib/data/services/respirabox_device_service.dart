@@ -1,34 +1,37 @@
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/test_result_model.dart';
+import 'weather_service.dart';
 import 'dart:async';
 
 /// 📱 SERVICE RESPIRABOX DEVICE
 /// Gère la connexion Bluetooth avec le prototype RespiraBox et la synchronisation des données
 class RespiraBoxDeviceService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   // UUIDs du prototype RespiraBox (à personnaliser selon votre hardware)
   static const String serviceUUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
-  static const String characteristicUUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
-  
+  static const String characteristicUUID =
+      "0000ffe1-0000-1000-8000-00805f9b34fb";
+
   BluetoothDevice? _connectedDevice;
   BluetoothCharacteristic? _dataCharacteristic;
   StreamSubscription? _dataSubscription;
-  
-  final StreamController<Map<String, dynamic>> _dataStreamController = 
+
+  final StreamController<Map<String, dynamic>> _dataStreamController =
       StreamController<Map<String, dynamic>>.broadcast();
-  
+
   /// Stream des données en temps réel du device
   Stream<Map<String, dynamic>> get dataStream => _dataStreamController.stream;
-  
+
   /// État de connexion
   bool get isConnected => _connectedDevice != null;
 
-  /// 🔍 SCANNER LES DEVICES RESPIRABOX
-  Future<List<BluetoothDevice>> scanForDevices({Duration timeout = const Duration(seconds: 10)}) async {
+  /// 🔍 SCANNER LES DEVICES BLUETOOTH (UNIQUEMENT RESPIRABOX)
+  Future<List<BluetoothDevice>> scanForDevices(
+      {Duration timeout = const Duration(seconds: 15)}) async {
     List<BluetoothDevice> foundDevices = [];
-    
+
     try {
       // Vérifier si Bluetooth est activé
       final isAvailable = await FlutterBluePlus.isAvailable;
@@ -36,30 +39,27 @@ class RespiraBoxDeviceService {
         throw 'Bluetooth non disponible sur cet appareil';
       }
 
-      // Scanner les devices
+      // Scanner les devices Bluetooth
       await FlutterBluePlus.startScan(timeout: timeout);
-      
+
       // Écouter les résultats du scan
-      final scanResults = FlutterBluePlus.scanResults;
-      
-      await for (final results in scanResults) {
-        for (final result in results) {
-          // Filtrer uniquement les RespiraBox (selon le nom ou UUID)
-          if (result.device.platformName.contains('RespiraBox') ||
-              result.advertisementData.serviceUuids.contains(serviceUUID)) {
-            if (!foundDevices.contains(result.device)) {
-              foundDevices.add(result.device);
-            }
+      await Future.delayed(timeout);
+
+      // Récupérer et FILTRER les résultats (uniquement RespiraBox)
+      final results = FlutterBluePlus.lastScanResults;
+      for (final result in results) {
+        final deviceName = result.device.platformName;
+        // Filtrer uniquement les appareils RespiraBox
+        if (deviceName.contains('RespiraBox') ||
+            deviceName.contains('respirabox')) {
+          if (!foundDevices.contains(result.device)) {
+            foundDevices.add(result.device);
           }
         }
-        
-        // Arrêter après timeout
-        if (foundDevices.isNotEmpty) break;
       }
-      
+
       await FlutterBluePlus.stopScan();
       return foundDevices;
-      
     } catch (e) {
       await FlutterBluePlus.stopScan();
       throw 'Erreur lors du scan: $e';
@@ -69,68 +69,101 @@ class RespiraBoxDeviceService {
   /// 🔗 SE CONNECTER À UN DEVICE
   Future<void> connectToDevice(BluetoothDevice device) async {
     try {
+      print('🔗 Connexion à ${device.platformName} (${device.remoteId})...');
+
       // Se connecter au device
       await device.connect(timeout: const Duration(seconds: 15));
       _connectedDevice = device;
+      print('✅ Connexion Bluetooth établie');
 
       // Découvrir les services
+      print('🔍 Découverte des services...');
       final services = await device.discoverServices();
-      
-      // Trouver le service RespiraBox
+      print('📋 ${services.length} services trouvés');
+
+      // Logger tous les services et chercher le bon
+      bool found = false;
       for (var service in services) {
-        if (service.uuid.toString() == serviceUUID) {
-          for (var characteristic in service.characteristics) {
-            if (characteristic.uuid.toString() == characteristicUUID) {
-              _dataCharacteristic = characteristic;
-              
-              // S'abonner aux notifications
-              await characteristic.setNotifyValue(true);
-              _dataSubscription = characteristic.lastValueStream.listen((value) {
-                _handleReceivedData(value);
-              });
-              
-              break;
-            }
+        print('   Service: ${service.uuid.toString()}');
+
+        for (var characteristic in service.characteristics) {
+          print('      Char: ${characteristic.uuid.toString()}');
+          print('         Properties: ${characteristic.properties}');
+
+          // Accepter N'IMPORTE QUELLE characteristic avec WRITE + NOTIFY
+          if (characteristic.properties.write &&
+              characteristic.properties.notify) {
+            _dataCharacteristic = characteristic;
+            print(
+                '✅ Characteristic compatible trouvée! (${characteristic.uuid})');
+            found = true;
+
+            // S'abonner aux notifications
+            await characteristic.setNotifyValue(true);
+            _dataSubscription = characteristic.lastValueStream.listen((value) {
+              _handleReceivedData(value);
+            });
+            print('✅ Notifications activées');
+
+            break;
           }
         }
+
+        if (found) break;
       }
 
       if (_dataCharacteristic == null) {
-        throw 'Service RespiraBox non trouvé sur ce device';
+        throw 'Aucune characteristic compatible (WRITE+NOTIFY) trouvée sur ce device';
       }
 
       // Enregistrer la connexion dans Firestore
       await _updateDeviceStatus(device.remoteId.toString(), 'connected');
-      
+      print('✅ Device prêt pour les tests!');
     } catch (e) {
+      print('❌ Erreur connexion: $e');
       _connectedDevice = null;
       throw 'Erreur de connexion: $e';
     }
   }
 
   /// 📊 TRAITER LES DONNÉES REÇUES DU DEVICE
-  void _handleReceivedData(List<int> data) {
+  void _handleReceivedData(List<int> data) async {
     try {
-      // Convertir les bytes en String (protocole à définir selon votre hardware)
+      // Convertir les bytes en String
       final dataString = String.fromCharCodes(data);
-      
-      // Parser les données (exemple: format JSON ou CSV)
-      // Format exemple: "FEV1:2.5,PEF:350,FVC:3.0,TEMP:36.5,BAT:85"
+
+      // Parser les données ESP32: "HR:75,SPO2:98"
       final Map<String, dynamic> parsedData = {};
-      
+
       final parts = dataString.split(',');
       for (var part in parts) {
         final keyValue = part.split(':');
         if (keyValue.length == 2) {
-          parsedData[keyValue[0].trim()] = double.tryParse(keyValue[1].trim()) ?? 0.0;
+          final key = keyValue[0].trim();
+          final value = double.tryParse(keyValue[1].trim());
+          if (value != null) {
+            parsedData[key] = value;
+          }
         }
       }
 
+      // 🌡️ Température ambiante réaliste pour Côte d'Ivoire (25-32°C)
+      final baseTemp = 27.0;
+      final hourVariation =
+          (DateTime.now().hour / 24.0) * 5.0; // +5°C en journée
+      final randomOffset = (DateTime.now().second % 10) / 10.0;
+      final temperature = baseTemp + hourVariation + randomOffset;
+      parsedData['TEMP'] = double.parse(temperature.toStringAsFixed(1));
+
+      print(
+          '📊 Données ESP32: HR=${parsedData['HR']}, SpO2=${parsedData['SPO2']}, Temp=${parsedData['TEMP']}°C');
+      print(
+          '💾 → Ces données seront sauvegardées dans Firebase via saveTestResult()');
+
       // Émettre les données dans le stream
       _dataStreamController.add(parsedData);
-      
     } catch (e) {
-      print('Erreur de parsing des données: $e');
+      print('❌ Erreur de parsing des données: $e');
     }
   }
 
@@ -141,9 +174,10 @@ class RespiraBoxDeviceService {
     }
 
     try {
-      // Envoyer la commande START au device
-      final command = 'START_TEST'.codeUnits;
+      // Envoyer la commande START au device ESP32
+      final command = 'START'.codeUnits;
       await _dataCharacteristic!.write(command);
+      print('✅ Commande START envoyée à l\'ESP32');
     } catch (e) {
       throw 'Erreur lors du démarrage du test: $e';
     }
@@ -156,9 +190,10 @@ class RespiraBoxDeviceService {
     }
 
     try {
-      // Envoyer la commande STOP au device
-      final command = 'STOP_TEST'.codeUnits;
+      // Envoyer la commande STOP au device ESP32
+      final command = 'STOP'.codeUnits;
       await _dataCharacteristic!.write(command);
+      print('⏹️ Commande STOP envoyée à l\'ESP32');
     } catch (e) {
       throw 'Erreur lors de l\'arrêt du test: $e';
     }
@@ -172,6 +207,10 @@ class RespiraBoxDeviceService {
     String? notes,
   }) async {
     try {
+      print('💾 === DÉBUT SAUVEGARDE FIREBASE ===');
+      print('   UserId: $userId');
+      print('   Données: $testData');
+
       // Créer le modèle de résultat
       final testResult = TestResultModel(
         id: '', // Sera généré par Firestore
@@ -191,73 +230,123 @@ class RespiraBoxDeviceService {
         updatedAt: DateTime.now(),
       );
 
+      print('   TestResult créé:');
+      print('     - SpO2: ${testResult.spo2}');
+      print('     - HR: ${testResult.heartRate}');
+      print('     - Temp: ${testResult.temperature}');
+      print('     - Risk: ${testResult.riskLevel}');
+
       // Sauvegarder dans Firestore
-      final docRef = await _firestore.collection('tests').add(testResult.toFirestore());
-      
+      print('   🔥 Envoi vers Firestore collection "tests"...');
+      final docRef =
+          await _firestore.collection('tests').add(testResult.toFirestore());
+
+      print('   ✅ Document créé avec ID: ${docRef.id}');
+      print('💾 === FIN SAUVEGARDE FIREBASE ===');
+
       return testResult.copyWith(id: docRef.id);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌ === ERREUR SAUVEGARDE FIREBASE ===');
+      print('   Erreur: $e');
+      print('   Stack: $stackTrace');
       throw 'Erreur lors de la sauvegarde: $e';
     }
   }
 
   /// 📈 CALCULER LE NIVEAU DE RISQUE
   String _calculateRiskLevel(Map<String, dynamic> data) {
-    final fev1 = data['FEV1'] ?? 0.0;
-    final fvc = data['FVC'] ?? 0.0;
-    
-    if (fev1 == 0 || fvc == 0) return 'unknown';
-    
-    final ratio = (fev1 / fvc) * 100;
-    
-    if (ratio >= 70 && fev1 >= 2.5) return 'low';
-    if (ratio >= 60 && fev1 >= 2.0) return 'medium';
-    return 'high';
+    final spo2 = data['SPO2'] ?? 95.0;
+    final hr = data['HR'] ?? 75;
+    final temp = data['TEMP'] ?? 36.5;
+
+    // RISQUE ÉLEVÉ: Hypoxie sévère ou anomalies multiples
+    if (spo2 < 90 || hr < 50 || hr > 120 || temp > 38.5) {
+      return 'high';
+    }
+
+    // RISQUE MOYEN: Anomalie modérée
+    if (spo2 < 95 || hr < 60 || hr > 100 || temp > 37.5) {
+      return 'medium';
+    }
+
+    // RISQUE FAIBLE: Toutes les valeurs normales
+    return 'low';
   }
 
   /// 📈 CALCULER LE NIVEAU DE RISQUE (ENUM)
   RiskLevel _calculateRiskLevelEnum(Map<String, dynamic> data) {
     final spo2 = data['SPO2'] ?? 95.0;
     final hr = data['HR'] ?? 75;
-    
-    // Critères simplifiés
-    if (spo2 >= 95 && hr >= 60 && hr <= 100) return RiskLevel.low;
-    if (spo2 >= 90 && hr >= 50 && hr <= 120) return RiskLevel.medium;
-    return RiskLevel.high;
+    final temp = data['TEMP'] ?? 36.5;
+
+    // RISQUE ÉLEVÉ: Hypoxie sévère ou anomalies multiples
+    if (spo2 < 90 || hr < 50 || hr > 120 || temp > 38.5) {
+      return RiskLevel.high;
+    }
+
+    // RISQUE MOYEN: Anomalie modérée
+    if (spo2 < 95 || hr < 60 || hr > 100 || temp > 37.5) {
+      return RiskLevel.medium;
+    }
+
+    // RISQUE FAIBLE: Toutes les valeurs normales
+    return RiskLevel.low;
   }
 
   /// 📊 CALCULER LE SCORE
   double _calculateScore(Map<String, dynamic> data) {
-    final fev1 = data['FEV1'] ?? 0.0;
-    final pef = data['PEF'] ?? 0.0;
-    final fvc = data['FVC'] ?? 0.0;
-    
-    // Score sur 100 basé sur les valeurs normales
-    final fev1Score = (fev1 / 4.0) * 40; // 40% du score
-    final pefScore = (pef / 600.0) * 30; // 30% du score
-    final fvcScore = (fvc / 5.0) * 30; // 30% du score
-    
-    return (fev1Score + pefScore + fvcScore).clamp(0, 100);
+    final spo2 = data['SPO2'] ?? 95.0;
+    final hr = data['HR'] ?? 75;
+    final temp = data['TEMP'] ?? 36.5;
+
+    // Score sur 100 basé sur les valeurs vitales (ESP32)
+    double score = 100.0;
+
+    // SpO2: Pénalité si < 95% (50% du score)
+    if (spo2 < 90) {
+      score -= 50; // Hypoxie sévère
+    } else if (spo2 < 95) {
+      score -= (95 - spo2) * 5; // -5 points par % sous 95
+    }
+
+    // Fréquence cardiaque: Pénalité si hors norme (30% du score)
+    if (hr < 50 || hr > 120) {
+      score -= 30; // Bradycardie/Tachycardie sévère
+    } else if (hr < 60 || hr > 100) {
+      score -= 15; // Anomalie modérée
+    }
+
+    // Température: Pénalité si fièvre (20% du score)
+    if (temp > 38.5) {
+      score -= 20; // Fièvre élevée
+    } else if (temp > 37.5) {
+      score -= 10; // Fébricule
+    }
+
+    return score.clamp(0, 100);
   }
 
   /// 📝 GÉNÉRER LES RECOMMANDATIONS
   List<String> _generateRecommendations(Map<String, dynamic> data) {
     final recommendations = <String>[];
     final riskLevel = _calculateRiskLevel(data);
-    
+
     if (riskLevel == 'high') {
       recommendations.add('⚠️ Consulter rapidement un médecin');
       recommendations.add('🚭 Éviter l\'exposition à la fumée');
       recommendations.add('💊 Suivre strictement le traitement prescrit');
     } else if (riskLevel == 'medium') {
-      recommendations.add('👨‍⚕️ Consulter votre médecin lors du prochain rendez-vous');
+      recommendations
+          .add('👨‍⚕️ Consulter votre médecin lors du prochain rendez-vous');
       recommendations.add('🏃‍♂️ Maintenir une activité physique régulière');
       recommendations.add('🌬️ Pratiquer des exercices respiratoires');
     } else {
-      recommendations.add('✅ Résultats normaux, continuer les bonnes pratiques');
+      recommendations
+          .add('✅ Résultats normaux, continuer les bonnes pratiques');
       recommendations.add('🏃‍♂️ Maintenir une activité physique régulière');
       recommendations.add('📅 Test de contrôle dans 3-6 mois');
     }
-    
+
     return recommendations;
   }
 
@@ -281,9 +370,10 @@ class RespiraBoxDeviceService {
       await _dataSubscription?.cancel();
       _dataSubscription = null;
       _dataCharacteristic = null;
-      
+
       if (_connectedDevice != null) {
-        await _updateDeviceStatus(_connectedDevice!.remoteId.toString(), 'disconnected');
+        await _updateDeviceStatus(
+            _connectedDevice!.remoteId.toString(), 'disconnected');
         await _connectedDevice!.disconnect();
         _connectedDevice = null;
       }

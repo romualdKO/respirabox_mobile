@@ -106,15 +106,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       prefixIcon: const Icon(Icons.email_outlined),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.borderColor),
+                        borderSide:
+                            const BorderSide(color: AppColors.borderColor),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.borderColor),
+                        borderSide:
+                            const BorderSide(color: AppColors.borderColor),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                        borderSide: const BorderSide(
+                            color: AppColors.primary, width: 2),
                       ),
                     ),
                     validator: (value) {
@@ -141,7 +144,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                          const Icon(Icons.error_outline,
+                              color: AppColors.error, size: 20),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -171,7 +175,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           ? const CircularProgressIndicator(color: Colors.white)
                           : Text(
                               'Envoyer les instructions',
-                              style: AppTextStyles.button.copyWith(color: Colors.white),
+                              style: AppTextStyles.button
+                                  .copyWith(color: Colors.white),
                             ),
                     ),
                   ),
@@ -244,7 +249,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                       child: Text(
                         'Retour à la connexion',
-                        style: AppTextStyles.button.copyWith(color: Colors.white),
+                        style:
+                            AppTextStyles.button.copyWith(color: Colors.white),
                       ),
                     ),
                   ),

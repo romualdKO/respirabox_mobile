@@ -6,7 +6,6 @@ import 'package:path_provider/path_provider.dart';
 /// Alternative à Firebase Storage pour le mode Spark (gratuit)
 /// Gère la sauvegarde locale de fichiers (audio, images, PDF)
 class LocalStorageService {
-  
   /// Obtenir le répertoire de stockage de l'app
   Future<Directory> get _appDirectory async {
     return await getApplicationDocumentsDirectory();
@@ -20,18 +19,19 @@ class LocalStorageService {
   }) async {
     try {
       final appDir = await _appDirectory;
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(audioFile.path)}';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${path.basename(audioFile.path)}';
       final testDir = Directory('${appDir.path}/audio_tests/$userId/$testId');
-      
+
       // Créer le dossier si nécessaire
       if (!await testDir.exists()) {
         await testDir.create(recursive: true);
       }
-      
+
       // Copier le fichier audio
       final savedFile = File('${testDir.path}/$fileName');
       await audioFile.copy(savedFile.path);
-      
+
       print('✅ Audio sauvegardé localement: ${savedFile.path}');
       return savedFile.path;
     } catch (e) {
@@ -46,16 +46,17 @@ class LocalStorageService {
   }) async {
     try {
       final appDir = await _appDirectory;
-      final fileName = 'profile_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName =
+          'profile_${userId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final profileDir = Directory('${appDir.path}/profile_images/$userId');
-      
+
       if (!await profileDir.exists()) {
         await profileDir.create(recursive: true);
       }
-      
+
       final savedFile = File('${profileDir.path}/$fileName');
       await imageFile.copy(savedFile.path);
-      
+
       print('✅ Photo de profil sauvegardée: ${savedFile.path}');
       return savedFile.path;
     } catch (e) {
@@ -71,16 +72,17 @@ class LocalStorageService {
   }) async {
     try {
       final appDir = await _appDirectory;
-      final fileName = 'report_${testId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final fileName =
+          'report_${testId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
       final reportsDir = Directory('${appDir.path}/pdf_reports/$userId');
-      
+
       if (!await reportsDir.exists()) {
         await reportsDir.create(recursive: true);
       }
-      
+
       final savedFile = File('${reportsDir.path}/$fileName');
       await pdfFile.copy(savedFile.path);
-      
+
       print('✅ PDF sauvegardé: ${savedFile.path}');
       return savedFile.path;
     } catch (e) {
@@ -106,11 +108,11 @@ class LocalStorageService {
     try {
       final appDir = await _appDirectory;
       final testDir = Directory('${appDir.path}/audio_tests/$userId/$testId');
-      
+
       if (!await testDir.exists()) {
         return [];
       }
-      
+
       final files = testDir.listSync();
       return files.map((file) => file.path).toList();
     } catch (e) {
@@ -123,7 +125,7 @@ class LocalStorageService {
     try {
       final appDir = await _appDirectory;
       final testDir = Directory('${appDir.path}/audio_tests/$userId/$testId');
-      
+
       if (await testDir.exists()) {
         await testDir.delete(recursive: true);
         print('✅ Tous les fichiers du test supprimés');
@@ -171,16 +173,16 @@ class LocalStorageService {
     try {
       final appDir = await _appDirectory;
       final profileDir = Directory('${appDir.path}/profile_images/$userId');
-      
+
       if (!await profileDir.exists()) {
         return null;
       }
-      
+
       final files = profileDir.listSync();
       if (files.isEmpty) {
         return null;
       }
-      
+
       // Retourner le fichier le plus récent
       files.sort((a, b) => b.path.compareTo(a.path));
       return files.first.path;

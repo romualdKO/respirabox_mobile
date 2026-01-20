@@ -66,7 +66,8 @@ class TestPreparationScreen extends StatelessWidget {
                     _buildInstructionCard(
                       number: '1',
                       title: 'Position assise',
-                      description: 'Asseyez-vous confortablement, le dos droit et détendu',
+                      description:
+                          'Asseyez-vous confortablement, le dos droit et détendu',
                       icon: Icons.chair_outlined,
                       color: AppColors.primary,
                     ),
@@ -75,7 +76,8 @@ class TestPreparationScreen extends StatelessWidget {
                     _buildInstructionCard(
                       number: '2',
                       title: 'Calme et respiration',
-                      description: 'Respirez normalement pendant 2-3 minutes avant le test',
+                      description:
+                          'Respirez normalement pendant 2-3 minutes avant le test',
                       icon: Icons.air_outlined,
                       color: AppColors.info,
                     ),
@@ -84,7 +86,8 @@ class TestPreparationScreen extends StatelessWidget {
                     _buildInstructionCard(
                       number: '3',
                       title: 'Capteur au doigt',
-                      description: 'Placez correctement le capteur d\'oxymétrie sur votre index',
+                      description:
+                          'Placez correctement le capteur d\'oxymétrie sur votre index',
                       icon: Icons.fingerprint_outlined,
                       color: AppColors.secondary,
                     ),
@@ -93,7 +96,8 @@ class TestPreparationScreen extends StatelessWidget {
                     _buildInstructionCard(
                       number: '4',
                       title: 'Ne bougez pas',
-                      description: 'Restez immobile pendant toute la durée du test (30 secondes)',
+                      description:
+                          'Restez immobile pendant toute la durée du test (30 secondes)',
                       icon: Icons.do_not_disturb_alt_outlined,
                       color: AppColors.warning,
                     ),

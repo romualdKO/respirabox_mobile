@@ -98,9 +98,9 @@ class NotificationModel {
 
 /// 📑 TYPES DE NOTIFICATIONS
 enum NotificationType {
-  testComplete,  // Test terminé
-  reminder,      // Rappel
-  alert,         // Alerte importante
-  info,          // Information
-  success,       // Succès
+  testComplete, // Test terminé
+  reminder, // Rappel
+  alert, // Alerte importante
+  info, // Information
+  success, // Succès
 }

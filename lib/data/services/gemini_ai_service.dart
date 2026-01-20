@@ -3,26 +3,30 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/test_result_model.dart';
 
-/// 🤖 SERVICE IA COHERE
-/// Analyse les données de tests et fournit des prédictions/recommandations intelligentes
+/// 🤖 SERVICE IA RESPIRABOX
+/// Analyse les données de tests et fournit des prédictions/recommandations médicales intelligentes
 class GeminiAIService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
-  // 🔑 Clé API Cohere : https://dashboard.cohere.com/api-keys
+
+  // 🔑 Clé API interne
   static const String _apiKey = 'zFG0EfXmnaaOxAkC98GMiJWjue3u8n4J1It1biFj';
   static const String _apiUrl = 'https://api.cohere.ai/v1/chat';
 
   GeminiAIService() {
-    print('✅ Cohere AI initialisé avec succès');
+    print('✅ Assistant médical RespiraBox initialisé');
   }
 
-  /// 🌐 APPEL À L'API COHERE
-  /// Méthode helper pour envoyer des prompts à Cohere
+  /// 🌐 APPEL À L'API INTERNE
+  /// Méthode helper pour envoyer des requêtes à l'assistant médical
   Future<String> _callCohereAPI(String prompt) async {
     try {
       // Essayer différents modèles disponibles
-      final models = ['command-light', 'command-nightly', 'command-light-nightly'];
-      
+      final models = [
+        'command-light',
+        'command-nightly',
+        'command-light-nightly'
+      ];
+
       for (final model in models) {
         try {
           final response = await http.post(
@@ -49,10 +53,10 @@ class GeminiAIService {
           continue;
         }
       }
-      
-      return '🤖 Aucun modèle Cohere disponible. Veuillez vérifier votre clé API ou réessayer plus tard.';
+
+      return '🤖 Service temporairement indisponible. Veuillez réessayer plus tard.';
     } catch (e) {
-      print('❌ Erreur appel Cohere: $e');
+      print('❌ Erreur appel API: $e');
       return 'Erreur de connexion à l\'IA.';
     }
   }
@@ -66,19 +70,19 @@ class GeminiAIService {
     try {
       // Récupérer le contexte utilisateur (derniers tests + profil)
       final userContext = await _getUserHealthContext(userId);
-      
+
       // Détecter automatiquement l'intention et agir
       final prompt = _buildIntelligentPrompt(userMessage, userContext);
-      
-      print('🔍 Envoi à Cohere API...');
+
+      print('🔍 Analyse en cours...');
       print('📝 Prompt length: ${prompt.length} caractères');
-      
+
       // Utiliser la méthode helper qui teste plusieurs modèles
       return await _callCohereAPI(prompt);
     } catch (e, stackTrace) {
-      print('❌ Erreur Cohere AI: $e');
+      print('❌ Erreur analyse IA: $e');
       print('📍 Stack trace: $stackTrace');
-      
+
       return 'Une erreur s\'est produite. Veuillez réessayer.';
     }
   }
@@ -186,7 +190,8 @@ Sois précis, basé sur les données, et utilise un ton professionnel mais rassu
         return 'Effectuez votre premier test pour recevoir des recommandations personnalisées.';
       }
 
-      final lastTest = TestResultModel.fromFirestore(lastTestSnapshot.docs.first);
+      final lastTest =
+          TestResultModel.fromFirestore(lastTestSnapshot.docs.first);
 
       final recommendationPrompt = '''
 Tu es un assistant médical IA. Voici les résultats du dernier test respiratoire d'un patient :
@@ -221,12 +226,12 @@ Sois pratique, actionnable et rassurant. Maximum 200 mots.
     try {
       // 1️⃣ RÉCUPÉRER LE PROFIL UTILISATEUR COMPLET
       final userDoc = await _firestore.collection('users').doc(userId).get();
-      
+
       final context = StringBuffer();
-      
+
       if (userDoc.exists) {
         final userData = userDoc.data()!;
-        
+
         // Calculer l'âge à partir de dateOfBirth
         int? age;
         if (userData['dateOfBirth'] != null) {
@@ -234,43 +239,52 @@ Sois pratique, actionnable et rassurant. Maximum 200 mots.
             final birthDate = DateTime.parse(userData['dateOfBirth']);
             final now = DateTime.now();
             age = now.year - birthDate.year;
-            if (now.month < birthDate.month || (now.month == birthDate.month && now.day < birthDate.day)) {
+            if (now.month < birthDate.month ||
+                (now.month == birthDate.month && now.day < birthDate.day)) {
               age--;
             }
           } catch (e) {
             age = null;
           }
         }
-        
+
         context.writeln('👤 PROFIL DU PATIENT :');
-        context.writeln('  Nom: ${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}');
+        context.writeln(
+            '  Nom: ${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}');
         context.writeln('  Email: ${userData['email'] ?? 'Non renseigné'}');
-        context.writeln('  Téléphone: ${userData['phoneNumber'] ?? 'Non renseigné'}');
+        context.writeln(
+            '  Téléphone: ${userData['phoneNumber'] ?? 'Non renseigné'}');
         context.writeln('  Âge: ${age ?? 'Non renseigné'} ans');
         context.writeln('  Sexe: ${userData['gender'] ?? 'Non renseigné'}');
-        context.writeln('  Groupe sanguin: ${userData['bloodType'] ?? 'Non renseigné'}');
-        context.writeln('  Taille: ${userData['height'] ?? 'Non renseigné'} cm');
+        context.writeln(
+            '  Groupe sanguin: ${userData['bloodType'] ?? 'Non renseigné'}');
+        context
+            .writeln('  Taille: ${userData['height'] ?? 'Non renseigné'} cm');
         context.writeln('  Poids: ${userData['weight'] ?? 'Non renseigné'} kg');
-        
-        if (userData['medicalConditions'] != null && userData['medicalConditions'] != '') {
-          context.writeln('  ⚠️ Conditions médicales: ${userData['medicalConditions']}');
+
+        if (userData['medicalConditions'] != null &&
+            userData['medicalConditions'] != '') {
+          context.writeln(
+              '  ⚠️ Conditions médicales: ${userData['medicalConditions']}');
         }
-        
+
         if (userData['allergies'] != null && userData['allergies'] != '') {
           context.writeln('  🚨 Allergies: ${userData['allergies']}');
         }
-        
+
         if (userData['medications'] != null && userData['medications'] != '') {
           context.writeln('  💊 Médicaments: ${userData['medications']}');
         }
-        
-        if (userData['emergencyContact'] != null && userData['emergencyContact'] != '') {
-          context.writeln('  📞 Contact urgence: ${userData['emergencyContact']}');
+
+        if (userData['emergencyContact'] != null &&
+            userData['emergencyContact'] != '') {
+          context
+              .writeln('  📞 Contact urgence: ${userData['emergencyContact']}');
         }
-        
+
         context.writeln('');
       }
-      
+
       // 2️⃣ RÉCUPÉRER L'HISTORIQUE DES TESTS
       final testsSnapshot = await _firestore
           .collection('tests')
@@ -280,7 +294,8 @@ Sois pratique, actionnable et rassurant. Maximum 200 mots.
           .get();
 
       if (testsSnapshot.docs.isEmpty) {
-        context.writeln('📊 HISTORIQUE DES TESTS : Aucun test effectué pour le moment.');
+        context.writeln(
+            '📊 HISTORIQUE DES TESTS : Aucun test effectué pour le moment.');
         return context.toString();
       }
 
@@ -289,14 +304,16 @@ Sois pratique, actionnable et rassurant. Maximum 200 mots.
           .toList();
 
       context.writeln('📊 HISTORIQUE DES TESTS (${tests.length} derniers) :');
-      
+
       for (var i = 0; i < tests.length; i++) {
         final test = tests[i];
-        context.writeln('Test ${i + 1} (${test.testDate.toString().split(' ')[0]}) :');
+        context.writeln(
+            'Test ${i + 1} (${test.testDate.toString().split(' ')[0]}) :');
         context.writeln('  - SpO2: ${test.spo2}%');
         context.writeln('  - FC: ${test.heartRate} bpm');
         context.writeln('  - Température: ${test.temperature}°C');
-        context.writeln('  - Risque: ${test.riskLevel.toString().split('.').last}');
+        context.writeln(
+            '  - Risque: ${test.riskLevel.toString().split('.').last}');
       }
 
       return context.toString();
@@ -420,12 +437,15 @@ RÉPONSE CONCISE INTELLIGENTE :
   /// 📊 CONSTRUIRE LE PROMPT D'ANALYSE
   String _buildAnalysisPrompt(List<TestResultModel> tests) {
     final buffer = StringBuffer();
-    buffer.writeln('Tu es un analyste médical IA spécialisé en santé respiratoire.');
-    buffer.writeln('\nAnalyse les ${tests.length} tests suivants et identifie les TENDANCES CRITIQUES :\n');
+    buffer.writeln(
+        'Tu es un analyste médical IA spécialisé en santé respiratoire.');
+    buffer.writeln(
+        '\nAnalyse les ${tests.length} tests suivants et identifie les TENDANCES CRITIQUES :\n');
 
     for (var i = 0; i < tests.length; i++) {
       final test = tests[i];
-      buffer.writeln('TEST ${i + 1} (${test.testDate.toString().split(' ')[0]}) :');
+      buffer.writeln(
+          'TEST ${i + 1} (${test.testDate.toString().split(' ')[0]}) :');
       buffer.writeln('  SpO2: ${test.spo2}%');
       buffer.writeln('  FC: ${test.heartRate} bpm');
       buffer.writeln('  Température: ${test.temperature}°C');
@@ -450,16 +470,17 @@ Maximum 250 mots. Sois précis et actionnable.
   /// 📋 FORMATER LES TESTS POUR PRÉDICTION
   String _formatTestsForPrediction(List<TestResultModel> tests) {
     final buffer = StringBuffer();
-    
+
     for (var i = 0; i < tests.length; i++) {
       final test = tests[i];
       final daysAgo = DateTime.now().difference(test.testDate).inDays;
-      
+
       buffer.writeln('Test ${i + 1} (il y a $daysAgo jours) :');
       buffer.writeln('  - SpO2: ${test.spo2}%');
       buffer.writeln('  - Fréquence cardiaque: ${test.heartRate} bpm');
       buffer.writeln('  - Température: ${test.temperature}°C');
-      buffer.writeln('  - Niveau de risque: ${test.riskLevel.toString().split('.').last}');
+      buffer.writeln(
+          '  - Niveau de risque: ${test.riskLevel.toString().split('.').last}');
       buffer.writeln();
     }
 
@@ -512,10 +533,11 @@ Utilise un langage clair, accessible, et rassurant. Maximum 300 mots.
 
   /// 🔬 COMPARER DEUX TESTS
   /// Compare le dernier test avec un précédent pour identifier l'évolution
-  Future<String> compareTests(TestResultModel oldTest, TestResultModel newTest) async {
+  Future<String> compareTests(
+      TestResultModel oldTest, TestResultModel newTest) async {
     try {
       final daysBetween = newTest.testDate.difference(oldTest.testDate).inDays;
-      
+
       final comparisonPrompt = '''
 Tu es un médecin analysant l'évolution de la santé respiratoire d'un patient.
 

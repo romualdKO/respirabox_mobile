@@ -191,7 +191,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.error_outline, color: AppColors.error, size: 20),
+                        const Icon(Icons.error_outline,
+                            color: AppColors.error, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -317,13 +318,13 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
-    
+
     try {
       // Connexion avec Google via AuthService
       final user = await _authService.signInWithGoogle();
-      
+
       if (!mounted) return;
-      
+
       if (user != null) {
         // Connexion réussie
         ScaffoldMessenger.of(context).showSnackBar(
@@ -332,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
             backgroundColor: AppColors.success,
           ),
         );
-        
+
         // Navigation vers l'écran d'accueil
         Navigator.pushReplacementNamed(context, AppRoutes.home);
       } else {
@@ -342,7 +343,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = e.toString());
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erreur lors de la connexion Google: $e'),

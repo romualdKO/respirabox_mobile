@@ -11,13 +11,13 @@ class AppTextStyles {
     color: AppColors.textPrimary,
     letterSpacing: -0.5,
   );
-  
+
   static const TextStyle headline2 = TextStyle(
     fontSize: 24,
     fontWeight: FontWeight.bold,
     color: AppColors.textPrimary,
   );
-  
+
   static const TextStyle headline3 = TextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w600,
@@ -34,7 +34,7 @@ class AppTextStyles {
     color: AppColors.textPrimary,
   );
   static const TextStyle bodyText = bodyLarge;
-  
+
   // 📝 CORPS DE TEXTE (Body)
   static const TextStyle bodyLarge = TextStyle(
     fontSize: 16,
@@ -42,34 +42,34 @@ class AppTextStyles {
     color: AppColors.textPrimary,
     height: 1.5,
   );
-  
+
   static const TextStyle bodyMedium = TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.normal,
     color: AppColors.textSecondary,
     height: 1.4,
   );
-  
+
   static const TextStyle bodySmall = TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.normal,
     color: AppColors.textSecondary,
   );
-  
+
   // 🔘 BOUTONS
   static const TextStyle button = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w600,
     letterSpacing: 0.5,
   );
-  
+
   // 🏷️ LABELS
   static const TextStyle label = TextStyle(
     fontSize: 14,
     fontWeight: FontWeight.w500,
     color: AppColors.textPrimary,
   );
-  
+
   // 💬 HINT (placeholder des inputs)
   static const TextStyle hint = TextStyle(
     fontSize: 14,

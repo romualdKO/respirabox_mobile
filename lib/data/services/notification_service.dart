@@ -7,9 +7,9 @@ import '../models/notification_model.dart';
 class NotificationService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  
+
   /// Collection Firestore des notifications
-  CollectionReference get _notificationsCollection => 
+  CollectionReference get _notificationsCollection =>
       _firestore.collection('notifications');
 
   /// 🔧 INITIALISER FCM (Firebase Cloud Messaging)
@@ -25,13 +25,13 @@ class NotificationService {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         print('✅ Permission notifications accordée');
-        
+
         // Récupérer le token FCM
         String? token = await _messaging.getToken();
         print('📱 Token FCM: $token');
-        
+
         // TODO: Sauvegarder le token dans Firestore pour envoyer des notifications
-        
+
         // Écouter les notifications en premier plan
         FirebaseMessaging.onMessage.listen((RemoteMessage message) {
           print('📩 Notification reçue: ${message.notification?.title}');
@@ -43,7 +43,6 @@ class NotificationService {
           print('🔔 Notification cliquée: ${message.notification?.title}');
           _handleNotificationTap(message);
         });
-        
       } else {
         print('❌ Permission notifications refusée');
       }
@@ -144,7 +143,7 @@ class NotificationService {
   Future<void> markAllAsRead(String userId) async {
     try {
       final unreadNotifications = await getUnreadNotifications(userId);
-      
+
       // Mise à jour en batch
       final batch = _firestore.batch();
       for (var notification in unreadNotifications) {
@@ -172,7 +171,7 @@ class NotificationService {
   Future<void> deleteAllNotifications(String userId) async {
     try {
       final notifications = await getUserNotifications(userId);
-      
+
       // Suppression en batch
       final batch = _firestore.batch();
       for (var notification in notifications) {
@@ -288,7 +287,7 @@ class NotificationService {
       // Analyser le niveau de risque moyen
       int highRiskCount = 0;
       int moderateRiskCount = 0;
-      
+
       for (var test in tests) {
         final riskLevel = test.data()['riskLevel'] as String?;
         if (riskLevel == 'high') highRiskCount++;
@@ -296,7 +295,7 @@ class NotificationService {
       }
 
       // LOGIQUE INTELLIGENTE DES RAPPELS
-      
+
       // 1. Risque élevé répété -> Alerte médicale urgente
       if (highRiskCount >= 2) {
         await sendAlertNotification(
@@ -358,14 +357,15 @@ class NotificationService {
         final previousTest = tests[1].data();
         final currentRisk = lastTest['riskLevel'];
         final previousRisk = previousTest['riskLevel'];
-        
+
         if (previousRisk == 'high' && currentRisk == 'moderate') {
           await createNotification(NotificationModel(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
             userId: userId,
             type: NotificationType.info,
             title: '🎉 Excellentes nouvelles !',
-            message: 'Vos résultats s\'améliorent ! Continuez vos efforts et maintenez une bonne hygiène respiratoire.',
+            message:
+                'Vos résultats s\'améliorent ! Continuez vos efforts et maintenez une bonne hygiène respiratoire.',
             createdAt: DateTime.now(),
           ));
         }
@@ -378,7 +378,6 @@ class NotificationService {
           '✅ Votre santé respiratoire semble bonne ! Test de contrôle mensuel recommandé.',
         );
       }
-
     } catch (e) {
       print('❌ Erreur notifications intelligentes: $e');
     }
@@ -397,10 +396,12 @@ class NotificationService {
           .get();
 
       if (lastNotifications.docs.isNotEmpty) {
-        final data = lastNotifications.docs.first.data() as Map<String, dynamic>;
+        final data =
+            lastNotifications.docs.first.data() as Map<String, dynamic>;
         final lastNotifDate = (data['createdAt'] as Timestamp).toDate();
-        final hoursSinceLastNotif = DateTime.now().difference(lastNotifDate).inHours;
-        
+        final hoursSinceLastNotif =
+            DateTime.now().difference(lastNotifDate).inHours;
+
         // Ne pas envoyer plus d'une notification toutes les 24h
         if (hoursSinceLastNotif < 24) {
           return;

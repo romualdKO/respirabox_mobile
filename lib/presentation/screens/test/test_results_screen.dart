@@ -12,7 +12,9 @@ class TestResultsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Récupérer les arguments (données du test)
-    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ??
+            {};
     final spo2 = args['spo2'] ?? 96;
     final heartRate = args['heartRate'] ?? 75;
     final temperature = args['temperature'] ?? 36.8;
@@ -38,7 +40,8 @@ class TestResultsScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.share, color: AppColors.textDark),
-            onPressed: () => _shareResults(context, riskLevel, riskScore, spo2, heartRate, temperature),
+            onPressed: () => _shareResults(
+                context, riskLevel, riskScore, spo2, heartRate, temperature),
           ),
         ],
       ),
@@ -173,7 +176,8 @@ class TestResultsScreen extends StatelessWidget {
             label: 'Fréquence cardiaque',
             value: '$heartRate bpm',
             status: heartRate <= 90 ? 'Normal' : 'Élevé',
-            statusColor: heartRate <= 90 ? AppColors.success : AppColors.warning,
+            statusColor:
+                heartRate <= 90 ? AppColors.success : AppColors.warning,
           ),
         ),
       ],
@@ -288,7 +292,7 @@ class TestResultsScreen extends StatelessWidget {
 
   Widget _buildRecommendations(String riskLevel) {
     final recommendations = _getRecommendations(riskLevel);
-    
+
     return Column(
       children: recommendations.map((rec) {
         return Container(
@@ -313,7 +317,8 @@ class TestResultsScreen extends StatelessWidget {
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(rec['icon'] as IconData, color: AppColors.primary, size: 20),
+                child: Icon(rec['icon'] as IconData,
+                    color: AppColors.primary, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -416,21 +421,48 @@ class TestResultsScreen extends StatelessWidget {
   List<Map<String, dynamic>> _getRecommendations(String riskLevel) {
     if (riskLevel.toLowerCase() == 'faible') {
       return [
-        {'icon': Icons.check_circle_outline, 'text': 'Continuez à surveiller votre santé régulièrement'},
-        {'icon': Icons.sports_outlined, 'text': 'Maintenez une activité physique régulière'},
-        {'icon': Icons.healing_outlined, 'text': 'Consultez un médecin en cas de symptômes'},
+        {
+          'icon': Icons.check_circle_outline,
+          'text': 'Continuez à surveiller votre santé régulièrement'
+        },
+        {
+          'icon': Icons.sports_outlined,
+          'text': 'Maintenez une activité physique régulière'
+        },
+        {
+          'icon': Icons.healing_outlined,
+          'text': 'Consultez un médecin en cas de symptômes'
+        },
       ];
     } else if (riskLevel.toLowerCase() == 'moyen') {
       return [
-        {'icon': Icons.medical_services_outlined, 'text': 'Consultez un professionnel de santé'},
-        {'icon': Icons.calendar_today_outlined, 'text': 'Surveillez vos symptômes quotidiennement'},
-        {'icon': Icons.phone_outlined, 'text': 'Contactez votre médecin si aggravation'},
+        {
+          'icon': Icons.medical_services_outlined,
+          'text': 'Consultez un professionnel de santé'
+        },
+        {
+          'icon': Icons.calendar_today_outlined,
+          'text': 'Surveillez vos symptômes quotidiennement'
+        },
+        {
+          'icon': Icons.phone_outlined,
+          'text': 'Contactez votre médecin si aggravation'
+        },
       ];
     } else {
       return [
-        {'icon': Icons.emergency_outlined, 'text': 'Consultez rapidement un professionnel de santé'},
-        {'icon': Icons.warning_amber_outlined, 'text': 'Évitez les efforts physiques intenses'},
-        {'icon': Icons.local_hospital_outlined, 'text': 'Rendez-vous aux urgences si difficultés respiratoires'},
+        {
+          'icon': Icons.emergency_outlined,
+          'text': 'Consultez rapidement un professionnel de santé'
+        },
+        {
+          'icon': Icons.warning_amber_outlined,
+          'text': 'Évitez les efforts physiques intenses'
+        },
+        {
+          'icon': Icons.local_hospital_outlined,
+          'text': 'Rendez-vous aux urgences si difficultés respiratoires'
+        },
       ];
     }
   }
@@ -445,8 +477,9 @@ class TestResultsScreen extends StatelessWidget {
     double temperature,
   ) {
     final now = DateTime.now();
-    final date = '${now.day}/${now.month}/${now.year} à ${now.hour}:${now.minute.toString().padLeft(2, '0')}';
-    
+    final date =
+        '${now.day}/${now.month}/${now.year} à ${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+
     final message = '''
 🫁 RespiraBox - Résultats du test
 
