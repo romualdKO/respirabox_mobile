@@ -9,6 +9,7 @@ import '../../../core/constants/text_styles.dart';
 import '../../../data/services/gemini_ai_service.dart';
 import '../../../data/services/assemblyai_service.dart';
 import '../../../data/services/conversation_service.dart';
+import '../../../data/services/patient_context_service.dart';
 import '../../../data/models/conversation_model.dart';
 import '../../../data/providers/conversation_provider.dart';
 import '../../../core/providers/app_providers.dart';
@@ -478,7 +479,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     setState(() {
       _isTyping = true;
       _messages.add(ChatMessage(
-        text: '🩺 Analyse de votre toux en cours...',
+        text: '🩺 Analyse acoustique avancée en cours (FFT, MFCC, spectral)...',
         isUser: false,
         timestamp: DateTime.now(),
       ));
@@ -486,89 +487,143 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     _scrollToBottom();
 
     try {
-      final analysis = await _assemblyAIService.analyzeCough(audioPath);
+      // 🆕 RÉCUPÉRATION CONTEXTE PATIENT COMPLET
+      print('🔍 Récupération contexte patient...');
+      Map<String, dynamic>? patientContext = await _buildPatientContext();
+
+      if (patientContext != null && patientContext.isNotEmpty) {
+        print(
+            '✅ Contexte patient récupéré avec ${patientContext.keys.length} paramètres');
+        if (patientContext.containsKey('spo2')) {
+          print('   → Mesures vitales récentes utilisées!');
+        }
+      }
+
+      // 🎵 ANALYSE AVEC FEATURES ACOUSTIQUES + CONTEXTE PATIENT
+      final analysis = await _assemblyAIService.analyzeCough(
+        audioPath,
+        patientContext: patientContext,
+      );
 
       // Retirer le message de chargement
       setState(() {
         _messages.removeLast();
       });
 
-      // Créer un message pour l'utilisateur
-      final userMessage = '🎤 [Audio de toux envoyé pour analyse]';
-      setState(() {
-        _messages.add(ChatMessage(
-          text: userMessage,
-          isUser: true,
-          timestamp: DateTime.now(),
-        ));
-      });
+      // 📊 NAVIGUER VERS ÉCRAN RÉSULTATS DÉTAILLÉS
+      if (analysis['hasCough'] == true) {
+        // Message utilisateur
+        setState(() {
+          _messages.add(ChatMessage(
+            text: '🎤 [Analyse de toux effectuée]',
+            isUser: true,
+            timestamp: DateTime.now(),
+          ));
+        });
 
-      // Sauvegarder dans la conversation
-      if (_currentConversation != null) {
-        await _conversationService.addMessage(
-          conversationId: _currentConversation!.id,
-          text: userMessage,
-          isUser: true,
-        );
+        // Message bot avec lien vers résultats
+        final tbRisk = analysis['tbRisk'] ?? 0;
+        final pneumoniaRisk = analysis['pneumoniaRisk'] ?? 0;
+        final urgency = analysis['urgencyLevel'] ?? 'low';
+
+        setState(() {
+          _messages.add(ChatMessage(
+            text: '''
+✅ Analyse terminée avec succès!
+
+📊 Résultats rapides:
+• Type: ${analysis['type']}
+• Risque TB: $tbRisk/100
+• Risque Pneumonie: $pneumoniaRisk/100
+• Urgence: ${urgency.toUpperCase()}
+
+Appuyez sur le bouton ci-dessous pour voir l'analyse complète avec graphique comparatif.
+''',
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+        });
+
+        // Naviguer vers écran résultats après court délai
+        Future.delayed(const Duration(milliseconds: 500), () {
+          Navigator.pushNamed(
+            context,
+            '/cough-analysis-results',
+            arguments: analysis,
+          );
+        });
+      } else {
+        // Pas de toux détectée
+        setState(() {
+          _messages.add(ChatMessage(
+            text: '🎤 [Audio envoyé pour analyse]',
+            isUser: true,
+            timestamp: DateTime.now(),
+          ));
+          _messages.add(ChatMessage(
+            text: 'Je n\'ai pas détecté de toux dans cet enregistrement. '
+                'Assurez-vous de tousser clairement pendant l\'enregistrement.',
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+          _isTyping = false;
+        });
       }
 
-      // Construire le contexte pour l'IA
-      final analysisContext = '''
-J'ai enregistré un audio de toux. Voici l'analyse:
-
-- Toux détectée: ${analysis['hasCough'] ? 'OUI ✅' : 'NON ❌'}
-- Nombre d'événements: ${analysis['coughCount']}
-- Durée audio: ${analysis['duration']} secondes
-
-Peux-tu analyser cette toux et me donner des conseils médicaux ?
-''';
-
-      // Envoyer à l'IA pour analyse approfondie
-      final userAsync = ref.read(currentUserProvider);
-      userAsync.when(
-        data: (user) async {
-          if (user != null) {
-            final aiResponse = await _geminiService.sendMessage(
-              userMessage: analysisContext,
-              userId: user.id,
-            );
-
-            final botMessage = ChatMessage(
-              text: aiResponse,
-              isUser: false,
-              timestamp: DateTime.now(),
-            );
-
-            setState(() {
-              _messages.add(botMessage);
-              _isTyping = false;
-            });
-
-            // Sauvegarder la réponse de l'IA
-            if (_currentConversation != null) {
-              await _conversationService.addMessage(
-                conversationId: _currentConversation!.id,
-                text: botMessage.text,
-                isUser: false,
-              );
-            }
-
-            _scrollToBottom();
-          }
-        },
-        loading: () {},
-        error: (_, __) {},
-      );
+      _scrollToBottom();
     } catch (e) {
+      print('❌ Erreur analyse toux: $e');
       setState(() {
-        _messages.removeLast();
+        if (_messages.isNotEmpty && _messages.last.text.contains('Analyse')) {
+          _messages.removeLast();
+        }
         _messages.add(ChatMessage(
-          text: '❌ Erreur d\'analyse: $e',
+          text: '❌ Erreur lors de l\'analyse de la toux: $e\n\n'
+              'Veuillez réessayer ou enregistrer un nouvel audio.',
           isUser: false,
           timestamp: DateTime.now(),
         ));
         _isTyping = false;
       });
+      _scrollToBottom();
+    }
+  }
+
+  /// 🔍 CONSTRUIRE CONTEXTE PATIENT COMPLET
+  ///
+  /// Combine:
+  /// - Profil utilisateur (si disponible)
+  /// - Mesures vitales récentes du test ESP32
+  Future<Map<String, dynamic>?> _buildPatientContext() async {
+    try {
+      final context = await PatientContextService.buildPatientContext();
+
+      if (context.isEmpty) {
+        print('⚠️ Aucun contexte patient disponible');
+        return null;
+      }
+
+      // Afficher message informatif sur les données utilisées
+      if (context.containsKey('spo2')) {
+        final vitalsAge = context['vitalsAge'] as int?;
+        setState(() {
+          _messages.add(ChatMessage(
+            text:
+                'ℹ️ Utilisation de vos mesures récentes (il y a $vitalsAge min):\n'
+                '  • SpO2: ${context['spo2']}%\n'
+                '  • Température: ${context['temperature']}°C\n'
+                '  • Fréquence cardiaque: ${context['heartRate']} bpm',
+            isUser: false,
+            timestamp: DateTime.now(),
+          ));
+        });
+        _scrollToBottom();
+      }
+
+      return context;
+    } catch (e) {
+      print('❌ Erreur construction contexte patient: $e');
+      return null;
     }
   }
 

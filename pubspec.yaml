@@ -65,7 +65,11 @@ dependencies:
   # 🎤 Audio Recording (flutter_sound - alternative stable)
   flutter_sound: ^9.2.13
   
-  # 📦 Storage
+  # 🎵 Audio Analysis (FFT, MFCC, Spectral features)
+  fftea: ^1.0.0
+  scidart: ^0.0.2-dev.7
+  
+  #  Storage
   firebase_storage: ^12.4.10
   
   # �🛠️ Utilitaires

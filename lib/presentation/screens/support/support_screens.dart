@@ -108,7 +108,7 @@ class HelpScreen extends StatelessWidget {
           title: 'Besoin d\'aide supplémentaire ?',
           content: 'Contactez notre équipe support:\n'
               '📧 Email: support@respirabox.ci\n'
-              '📞 Téléphone: +225 XX XX XX XX XX\n'
+              '📞 Téléphone: +225 0574432780\n'
               '🕐 Horaires: Lun-Ven 8h-18h',
         ),
       ],

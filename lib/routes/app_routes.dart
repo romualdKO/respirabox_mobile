@@ -13,6 +13,7 @@ import '../presentation/screens/test/test_results_screen.dart';
 import '../presentation/screens/chatbot/chatbot_screen.dart';
 import '../presentation/screens/notifications/notifications_screen.dart';
 import '../presentation/screens/support/support_screens.dart';
+import '../presentation/screens/analysis/cough_analysis_results_screen.dart';
 
 /// 🧭 GESTIONNAIRE DE ROUTES DE L'APPLICATION RESPIRABOX
 /// Définit toutes les routes de navigation
@@ -47,7 +48,10 @@ class AppRoutes {
   static const String history = '/history';
   static const String historyDetail = '/history-detail';
 
-  // 💬 CHATBOT IA
+  // �‍⚕️ ANALYSE MÉDICALE
+  static const String coughAnalysisResults = '/cough-analysis-results';
+
+  // �💬 CHATBOT IA
   static const String chatbot = '/chatbot';
 
   // 📚 SUPPORT
@@ -97,6 +101,12 @@ class AppRoutes {
 
       case chatbot:
         return MaterialPageRoute(builder: (_) => const ChatbotScreen());
+
+      case coughAnalysisResults:
+        return MaterialPageRoute(
+          builder: (_) => const CoughAnalysisResultsScreen(),
+          settings: settings,
+        );
 
       case notifications:
         return MaterialPageRoute(builder: (_) => const NotificationsScreen());

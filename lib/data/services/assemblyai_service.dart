@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'cough_analysis_extension.dart';
+import 'audio_features_extractor.dart';
 
 /// 🎤 SERVICE ASSEMBLYAI
 /// Transcription vocale et analyse audio (toux, respiration)
@@ -178,10 +179,29 @@ class AssemblyAIService {
   }
 
   /// 🩺 Analyser spécifiquement la toux avec détection TB/Pneumonie
-  Future<Map<String, dynamic>> analyzeCough(String audioFilePath) async {
+  ///
+  /// NOUVEAU: Intègre analyse acoustique avancée (FFT, MFCC, spectral)
+  /// et contexte patient pour scoring médical personnalisé
+  Future<Map<String, dynamic>> analyzeCough(
+    String audioFilePath, {
+    Map<String, dynamic>? patientContext,
+  }) async {
     try {
-      print('🩺 Analyse avancée de la toux...');
+      print('🩺 Analyse avancée de la toux avec features acoustiques...');
 
+      // 🎵 ÉTAPE 1: EXTRACTION FEATURES ACOUSTIQUES (NOUVEAU)
+      print('🎵 Extraction features audio (FFT, MFCC, spectral)...');
+      final audioFeatures =
+          await AudioFeaturesExtractor.extractFeatures(audioFilePath);
+
+      print('✅ Features extraites:');
+      print('   - Fréquence: ${audioFeatures['frequency']} Hz');
+      print(
+          '   - Énergie: ${(audioFeatures['energy'] * 100).toStringAsFixed(1)}%');
+      print('   - ZCR: ${audioFeatures['zeroCrossingRate']}');
+      print('   - Crépitements: ${audioFeatures['crackles']}');
+
+      // 🎤 ÉTAPE 2: TRANSCRIPTION ASSEMBLYAI
       final audioUrl = await uploadAudio(audioFilePath);
 
       // Configuration avancée pour analyse audio
@@ -234,13 +254,22 @@ class AssemblyAIService {
               // SI aucun texte transcrit mais durée > 1s, c'est probablement une toux
               final hasCoughBasedOnDuration = text.isEmpty && duration > 1.0;
 
-              // Analyse intelligente de la toux avec scoring médical
+              // 🧠 ÉTAPE 3: ANALYSE INTELLIGENTE AVEC FEATURES + CONTEXTE
               final coughAnalysis = CoughAnalysisHelper.analyzeCoughPattern(
                   text.isEmpty
                       ? 'son non-verbal toux'
                       : text, // Si vide, forcer détection
                   duration,
-                  confidence);
+                  confidence,
+                  audioFeatures: audioFeatures,
+                  patientContext: patientContext);
+
+              print('🎯 Analyse complète:');
+              print('   - Type toux: ${coughAnalysis['type']}');
+              print('   - Risque TB: ${coughAnalysis['tbRisk']}%');
+              print(
+                  '   - Risque Pneumonie: ${coughAnalysis['pneumoniaRisk']}%');
+              print('   - Niveau urgence: ${coughAnalysis['urgencyLevel']}');
 
               // Override si basé sur durée uniquement
               if (hasCoughBasedOnDuration) {
@@ -270,6 +299,12 @@ class AssemblyAIService {
                 'pneumoniaRisk': coughAnalysis['pneumoniaRisk'], // 0-100
                 'recommendation': coughAnalysis['recommendation'],
                 'medicalScore': coughAnalysis['medicalScore'],
+                // 🆕 NOUVELLES DONNÉES
+                'urgencyLevel': coughAnalysis['urgencyLevel'],
+                'actions': coughAnalysis['actions'],
+                'diseaseComparison': coughAnalysis['diseaseComparison'],
+                'acousticFeatures': coughAnalysis['acousticFeatures'],
+                'wetnessProbability': coughAnalysis['wetnessProbability'],
               };
             } else if (resultData['status'] == 'error') {
               throw Exception('Erreur analyse: ${resultData['error']}');
