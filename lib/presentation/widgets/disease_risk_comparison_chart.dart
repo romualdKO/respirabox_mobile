@@ -90,7 +90,7 @@ class DiseaseRiskComparisonChart extends StatelessWidget {
                   barTouchData: BarTouchData(
                     enabled: true,
                     touchTooltipData: BarTouchTooltipData(
-                      getTooltipColor: (group) => Colors.black87,
+                      tooltipBgColor: Colors.black87,
                       getTooltipItem: (group, groupIndex, rod, rodIndex) {
                         final disease =
                             group.x == 0 ? 'Tuberculose' : 'Pneumonie';

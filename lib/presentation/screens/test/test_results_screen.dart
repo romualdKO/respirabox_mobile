@@ -636,7 +636,7 @@ class TestResultsScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  if (tbIndicators.isNotEmpty) ..[
+                  if (tbIndicators.isNotEmpty) ...[
                     const Text(
                       '🔴 Indicateurs Tuberculose:',
                       style: TextStyle(
@@ -663,7 +663,7 @@ class TestResultsScreen extends StatelessWidget {
                         )),
                     const SizedBox(height: 8),
                   ],
-                  if (pneumoniaIndicators.isNotEmpty) ..[
+                  if (pneumoniaIndicators.isNotEmpty) ...[
                     const Text(
                       '🔵 Indicateurs Pneumonie:',
                       style: TextStyle(
