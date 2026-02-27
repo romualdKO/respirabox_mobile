@@ -44,17 +44,19 @@ class CoughAnalysisHelper {
     int? currentHR = patientContext?['heartRate'];
     List<String> medicalConditions = patientContext?['medicalConditions'] ?? [];
 
-    // 🆕 DÉTECTION TOUX AMÉLIORÉE - NE DÉPEND PLUS UNIQUEMENT DE LA TRANSCRIPTION
-    // Analyse basée sur transcription ET durée ET features acoustiques
+    // 🆕 DÉTECTION TOUX AMÉLIORÉE - BASÉE SUR ACOUSTIQUE (PAS SUR LES MOTS!)
+    // ⚠️ Vous N'AVEZ PAS BESOIN de dire "toux" - on analyse le SON directement
+    
+    // 1️⃣ Détection optionnelle par mots-clés (si vous parlez pendant l'enregistrement)
     final hasCoughKeywords = lowerText.contains('toux') ||
         lowerText.contains('crachat') ||
         lowerText.contains('respiration') ||
         lowerText.contains('expectoration');
 
-    // 🔊 DÉTECTION PAR DURÉE: Si audio > 1s, c'est probablement une toux
+    // 2️⃣ DÉTECTION PRINCIPALE PAR DURÉE: Si audio > 1s, analysable
     final hasCoughByDuration = duration > 1.0;
 
-    // 🎵 DÉTECTION PAR ACOUSTIQUE: Énergie élevée ou pics détectés
+    // 3️⃣ DÉTECTION PRINCIPALE PAR ACOUSTIQUE: Énergie élevée ou pics sonores
     bool hasCoughByAcoustics = false;
     if (audioFeatures != null) {
       final energy = audioFeatures['energy'] ?? 0.0;
@@ -62,15 +64,16 @@ class CoughAnalysisHelper {
       hasCoughByAcoustics = energy > 0.3 || peaks.length > 0;
     }
 
-    // ✅ TOUX DÉTECTÉE SI: mots-clés OU durée OU acoustique
+    // ✅ TOUX DÉTECTÉE SI: durée OU acoustique (mots-clés optionnels)
+    // 💡 Vous pouvez tousser SANS PARLER!
     final hasCough =
         hasCoughKeywords || hasCoughByDuration || hasCoughByAcoustics;
 
-    print('🔍 Détection toux:');
-    print('   - Mots-clés: $hasCoughKeywords (texte: "$text")');
-    print('   - Durée: $hasCoughByDuration (${duration}s)');
-    print('   - Acoustique: $hasCoughByAcoustics');
-    print('   ➡️ Résultat: ${hasCough ? "TOUX DÉTECTÉE ✅" : "PAS DE TOUX ❌"}');
+    print('🔍 Détection toux (analyse acoustique):');
+    print('   📏 Durée: $hasCoughByDuration (${duration}s) ${duration > 1.0 ? "✅" : "❌ trop court"}');
+    print('   🎵 Acoustique: $hasCoughByAcoustics (énergie ou pics) ${hasCoughByAcoustics ? "✅" : "❌"}');
+    print('   💬 Mots-clés: $hasCoughKeywords (optionnel) ${hasCoughKeywords ? "✅" : "⏭️ ignoré"}');
+    print('   ➡️ Résultat final: ${hasCough ? "TOUX DÉTECTÉE ✅" : "PAS DE TOUX ❌"}');
 
     // Estimation du nombre de toux (basé sur durée et patterns acoustiques)
     int estimatedCoughCount = (duration / 3).ceil(); // Baseline

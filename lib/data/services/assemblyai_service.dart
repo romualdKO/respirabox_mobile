@@ -251,41 +251,33 @@ class AssemblyAIService {
               final confidence = resultData['confidence'] ?? 0.0;
               final duration = resultData['audio_duration'] ?? 0.0;
 
-              // SI aucun texte transcrit mais durée > 1s, c'est probablement une toux
-              final hasCoughBasedOnDuration = text.isEmpty && duration > 1.0;
-
-              // 🧠 ÉTAPE 3: ANALYSE INTELLIGENTE AVEC FEATURES + CONTEXTE
+              // 🧠 ÉTAPE 3: ANALYSE INTELLIGENTE AVEC FEATURES ACOUSTIQUES + CONTEXTE
+              // ⚠️ NE DÉPEND PLUS DU TEXTE TRANSCRIT!
+              // La détection repose sur: durée, énergie, pics sonores
+              print('🎯 Analyse acoustique (transcription ignorée pour détection):');
+              print('   - Texte AssemblyAI: "$text"');
+              print('   - Durée audio: ${duration}s');
+              print('   - Énergie: ${audioFeatures['energy']}');
+              
               final coughAnalysis = CoughAnalysisHelper.analyzeCoughPattern(
-                  text.isEmpty
-                      ? 'son non-verbal toux'
-                      : text, // Si vide, forcer détection
+                  text.isEmpty ? 'son non-verbal' : text,
                   duration,
                   confidence,
                   audioFeatures: audioFeatures,
                   patientContext: patientContext);
 
-              print('🎯 Analyse complète:');
+              print('✅ Résultat analyse:');
+              print('   - Toux détectée: ${coughAnalysis['hasCough']}');
               print('   - Type toux: ${coughAnalysis['type']}');
               print('   - Risque TB: ${coughAnalysis['tbRisk']}%');
-              print(
-                  '   - Risque Pneumonie: ${coughAnalysis['pneumoniaRisk']}%');
+              print('   - Risque Pneumonie: ${coughAnalysis['pneumoniaRisk']}%');
               print('   - Niveau urgence: ${coughAnalysis['urgencyLevel']}');
-
-              // Override si basé sur durée uniquement
-              if (hasCoughBasedOnDuration) {
-                coughAnalysis['hasCough'] = true;
-                if (coughAnalysis['frequency'] == 0) {
-                  coughAnalysis['frequency'] =
-                      (duration / 2).ceil(); // Estimer 1 toux par 2 secondes
-                }
-              }
 
               return {
                 'status': 'completed',
-                'hasCough':
-                    coughAnalysis['hasCough'] || hasCoughBasedOnDuration,
+                'hasCough': coughAnalysis['hasCough'], // Basé UNIQUEMENT sur acoustique
                 'text': text.isEmpty
-                    ? '[Son non-verbal - ${hasCoughBasedOnDuration ? "toux détectée" : "audio inaudible"}]'
+                    ? '[Son non-verbal - analyse acoustique effectuée]'
                     : text,
                 'confidence': confidence,
                 'duration': duration,

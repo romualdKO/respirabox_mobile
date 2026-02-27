@@ -553,16 +553,37 @@ Appuyez sur le bouton ci-dessous pour voir l'analyse complète avec graphique co
           );
         });
       } else {
-        // Pas de toux détectée
+        // Audio trop court ou énergie insuffisante
         setState(() {
           _messages.add(ChatMessage(
             text: '🎤 [Audio envoyé pour analyse]',
             isUser: true,
             timestamp: DateTime.now(),
           ));
+          
+          // Expliquer POURQUOI la toux n'a pas été détectée
+          final duration = analysis['duration'] ?? 0.0;
+          final energy = analysis['acousticFeatures']?['energy'] ?? 0.0;
+          
+          String reason = '';
+          if (duration < 1.0) {
+            reason = '⏱️ Audio trop court (${duration.toStringAsFixed(1)}s). Enregistrez au moins 1 seconde.';
+          } else if (energy < 0.3) {
+            reason = '🔇 Énergie sonore insuffisante (${(energy * 100).toStringAsFixed(0)}%). Toussez plus fort près du micro.';
+          } else {
+            reason = '🎯 Aucune toux détectée dans le signal audio.';
+          }
+          
           _messages.add(ChatMessage(
-            text: 'Je n\'ai pas détecté de toux dans cet enregistrement. '
-                'Assurez-vous de tousser clairement pendant l\'enregistrement.',
+            text: '''❌ Toux non détectée
+
+$reason
+
+💡 Conseils:
+• Toussez clairement pendant 2-3 secondes
+• Rapprochez-vous du microphone
+• Évitez les bruits de fond
+• Toussez naturellement (pas besoin de parler)''',
             isUser: false,
             timestamp: DateTime.now(),
           ));
