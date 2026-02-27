@@ -21,15 +21,42 @@ class TestService {
   /// 📋 RÉCUPÉRER TOUS LES TESTS D'UN UTILISATEUR
   Future<List<TestResultModel>> getUserTests(String userId) async {
     try {
+      print('🔍 Récupération tests pour userId: $userId');
+
       final querySnapshot = await _testsCollection
           .where('userId', isEqualTo: userId)
           .orderBy('testDate', descending: true)
           .get();
 
+      print('📊 Nombre de tests trouvés: ${querySnapshot.docs.length}');
+
+      // Afficher détails des tests
+      if (querySnapshot.docs.isNotEmpty) {
+        print('✅ Tests récupérés:');
+        for (var i = 0; i < querySnapshot.docs.length && i < 3; i++) {
+          final doc = querySnapshot.docs[i];
+          final data = doc.data() as Map<String, dynamic>;
+          print('   Test ${i + 1}:');
+          print('     - ID: ${doc.id}');
+          print('     - Date: ${data['testDate']}');
+          print('     - SpO2: ${data['spo2']}%');
+          print('     - FC: ${data['heartRate']} bpm');
+          print('     - Score: ${data['riskScore']}');
+        }
+        if (querySnapshot.docs.length > 3) {
+          print('   ... et ${querySnapshot.docs.length - 3} autres');
+        }
+      } else {
+        print('⚠️ Aucun test trouvé pour cet utilisateur dans Firestore!');
+        print('   Vérifiez que userId correspond aux tests sauvegardés.');
+      }
+
       return querySnapshot.docs
           .map((doc) => TestResultModel.fromFirestore(doc))
           .toList();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌ Erreur lors de la récupération des tests: $e');
+      print('Stack trace: $stackTrace');
       throw 'Erreur lors de la récupération des tests: $e';
     }
   }
@@ -70,16 +97,32 @@ class TestService {
   Future<List<TestResultModel>> getRecentTests(String userId,
       {int limit = 5}) async {
     try {
+      print('🔍 Récupération des $limit derniers tests pour userId: $userId');
+
       final querySnapshot = await _testsCollection
           .where('userId', isEqualTo: userId)
           .orderBy('testDate', descending: true)
           .limit(limit)
           .get();
 
+      print('📊 Tests récents trouvés: ${querySnapshot.docs.length}');
+
+      // Debug: afficher les IDs des tests
+      if (querySnapshot.docs.isNotEmpty) {
+        print('✅ IDs des tests:');
+        for (var doc in querySnapshot.docs) {
+          print('   - ${doc.id}');
+        }
+      } else {
+        print('⚠️ Aucun test récent trouvé!');
+      }
+
       return querySnapshot.docs
           .map((doc) => TestResultModel.fromFirestore(doc))
           .toList();
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('❌ Erreur récupération tests récents: $e');
+      print('Stack: $stackTrace');
       throw 'Erreur lors de la récupération des tests récents: $e';
     }
   }

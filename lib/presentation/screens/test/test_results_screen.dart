@@ -81,7 +81,8 @@ class TestResultsScreen extends StatelessWidget {
               const SizedBox(height: 30),
 
               // 🆕 PRÉDICTION AUTOMATIQUE TB/PNEUMONIE (basée sur mesures vitales)
-              _buildDiseaseRiskPrediction(context, spo2, heartRate, temperature),
+              _buildDiseaseRiskPrediction(
+                  context, spo2, heartRate, temperature),
               const SizedBox(height: 30),
 
               // 🆕 ANALYSE TOUX APPROFONDIE (optionnelle)
@@ -498,17 +499,24 @@ class TestResultsScreen extends StatelessWidget {
     dynamic temperatureValue,
   ) {
     // Conversion sécurisée
-    final double spo2 = (spo2Value is int) ? spo2Value.toDouble() : (spo2Value as double);
-    final int heartRate = (heartRateValue is double) ? heartRateValue.toInt() : (heartRateValue as int);
-    final double temperature = (temperatureValue is int) ? temperatureValue.toDouble() : (temperatureValue as double);
+    final double spo2 =
+        (spo2Value is int) ? spo2Value.toDouble() : (spo2Value as double);
+    final int heartRate = (heartRateValue is double)
+        ? heartRateValue.toInt()
+        : (heartRateValue as int);
+    final double temperature = (temperatureValue is int)
+        ? temperatureValue.toDouble()
+        : (temperatureValue as double);
 
     // Analyse prédictive basée UNIQUEMENT sur parametres vitaux
-    final vitalsPrediction = _predictDiseaseRiskFromVitals(spo2, heartRate, temperature);
+    final vitalsPrediction =
+        _predictDiseaseRiskFromVitals(spo2, heartRate, temperature);
 
     final tbScore = vitalsPrediction['tbRisk'] as int;
     final pneumoniaScore = vitalsPrediction['pneumoniaRisk'] as int;
     final tbIndicators = vitalsPrediction['tbIndicators'] as List<String>;
-    final pneumoniaIndicators = vitalsPrediction['pneumoniaIndicators'] as List<String>;
+    final pneumoniaIndicators =
+        vitalsPrediction['pneumoniaIndicators'] as List<String>;
     final dominantRisk = vitalsPrediction['dominantRisk'] as String;
 
     // Créer données pour graphique
@@ -516,12 +524,15 @@ class TestResultsScreen extends StatelessWidget {
       'diseaseComparison': {
         'tuberculosis': {
           'score': tbScore,
-          'percentage': (tbScore / (tbScore + pneumoniaScore + 0.01) * 100).toInt(),
+          'percentage':
+              (tbScore / (tbScore + pneumoniaScore + 0.01) * 100).toInt(),
           'primaryIndicators': tbIndicators,
         },
         'pneumonia': {
           'score': pneumoniaScore,
-          'percentage': (pneumoniaScore / (tbScore + pneumoniaScore + 0.01) * 100).toInt(),
+          'percentage':
+              (pneumoniaScore / (tbScore + pneumoniaScore + 0.01) * 100)
+                  .toInt(),
           'primaryIndicators': pneumoniaIndicators,
         },
       },
@@ -600,8 +611,8 @@ class TestResultsScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: dominantRisk == 'TB' 
-                    ? Colors.red.shade50 
+                color: dominantRisk == 'TB'
+                    ? Colors.red.shade50
                     : dominantRisk == 'Pneumonie'
                         ? Colors.blue.shade50
                         : Colors.green.shade50,
@@ -613,9 +624,11 @@ class TestResultsScreen extends StatelessWidget {
                   Row(
                     children: [
                       Icon(
-                        dominantRisk == 'Aucun' ? Icons.check_circle : Icons.warning_amber,
-                        color: dominantRisk == 'TB' 
-                            ? Colors.red 
+                        dominantRisk == 'Aucun'
+                            ? Icons.check_circle
+                            : Icons.warning_amber,
+                        color: dominantRisk == 'TB'
+                            ? Colors.red
                             : dominantRisk == 'Pneumonie'
                                 ? Colors.blue
                                 : Colors.green,
@@ -699,12 +712,14 @@ class TestResultsScreen extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline, size: 18, color: Colors.blue),
+                        const Icon(Icons.info_outline,
+                            size: 18, color: Colors.blue),
                         const SizedBox(width: 8),
                         const Expanded(
                           child: Text(
                             'Pour une analyse plus précise, enregistrez votre toux ci-dessous',
-                            style: TextStyle(fontSize: 11, color: Colors.black87),
+                            style:
+                                TextStyle(fontSize: 11, color: Colors.black87),
                           ),
                         ),
                       ],
@@ -720,7 +735,7 @@ class TestResultsScreen extends StatelessWidget {
   }
 
   /// 🔬 ALGORITHME PRÉDICTION BASÉE UNIQUEMENT SUR PARAMÈTRES VITAUX
-  /// 
+  ///
   /// Utilise les critères cliniques OMS/PNLT pour scoring sans audio
   Map<String, dynamic> _predictDiseaseRiskFromVitals(
     double spo2,
@@ -742,7 +757,8 @@ class TestResultsScreen extends StatelessWidget {
       tbIndicators.add('SpO2 critique < 90% (${spo2.toStringAsFixed(1)}%)');
     } else if (spo2 < 92) {
       tbRisk += 25;
-      tbIndicators.add('SpO2 très bas ${spo2.toStringAsFixed(1)}% (TB avancée)');
+      tbIndicators
+          .add('SpO2 très bas ${spo2.toStringAsFixed(1)}% (TB avancée)');
     } else if (spo2 < 95) {
       tbRisk += 15;
       tbIndicators.add('SpO2 sous-optimal ${spo2.toStringAsFixed(1)}%');
@@ -751,10 +767,12 @@ class TestResultsScreen extends StatelessWidget {
     // Température modérée persistante (37.5-38.5°C typique TB)
     if (temperature >= 37.5 && temperature <= 38.5) {
       tbRisk += 20;
-      tbIndicators.add('Fièvre modérée persistante ${temperature.toStringAsFixed(1)}°C (profil TB)');
+      tbIndicators.add(
+          'Fièvre modérée persistante ${temperature.toStringAsFixed(1)}°C (profil TB)');
     } else if (temperature > 37.0 && temperature < 37.5) {
       tbRisk += 10;
-      tbIndicators.add('Température légèrement élevée ${temperature.toStringAsFixed(1)}°C');
+      tbIndicators.add(
+          'Température légèrement élevée ${temperature.toStringAsFixed(1)}°C');
     }
 
     // Fréquence cardiaque (TB: tachycardie modérée chronique)
@@ -773,10 +791,12 @@ class TestResultsScreen extends StatelessWidget {
       pneumoniaIndicators.add('🚨 SpO2 critique < 88% - URGENCE MÉDICALE');
     } else if (spo2 < 90) {
       pneumoniaRisk += 35;
-      pneumoniaIndicators.add('SpO2 très bas ${spo2.toStringAsFixed(1)}% (détresse respiratoire)');
+      pneumoniaIndicators.add(
+          'SpO2 très bas ${spo2.toStringAsFixed(1)}% (détresse respiratoire)');
     } else if (spo2 < 93) {
       pneumoniaRisk += 25;
-      pneumoniaIndicators.add('SpO2 bas ${spo2.toStringAsFixed(1)}% (oxygénothérapie nécessaire)');
+      pneumoniaIndicators.add(
+          'SpO2 bas ${spo2.toStringAsFixed(1)}% (oxygénothérapie nécessaire)');
     } else if (spo2 < 95) {
       pneumoniaRisk += 15;
       pneumoniaIndicators.add('SpO2 limite ${spo2.toStringAsFixed(1)}%');
@@ -785,19 +805,23 @@ class TestResultsScreen extends StatelessWidget {
     // Fièvre élevée aiguë (>38.5°C typique pneumonie bactérienne)
     if (temperature > 39.0) {
       pneumoniaRisk += 35;
-      pneumoniaIndicators.add('🔥 Fièvre élevée ${temperature.toStringAsFixed(1)}°C (infection aiguë)');
+      pneumoniaIndicators.add(
+          '🔥 Fièvre élevée ${temperature.toStringAsFixed(1)}°C (infection aiguë)');
     } else if (temperature > 38.5) {
       pneumoniaRisk += 30;
-      pneumoniaIndicators.add('Fièvre haute ${temperature.toStringAsFixed(1)}°C (pneumonie probable)');
+      pneumoniaIndicators.add(
+          'Fièvre haute ${temperature.toStringAsFixed(1)}°C (pneumonie probable)');
     } else if (temperature > 37.8) {
       pneumoniaRisk += 15;
-      pneumoniaIndicators.add('Fièvre modérée ${temperature.toStringAsFixed(1)}°C');
+      pneumoniaIndicators
+          .add('Fièvre modérée ${temperature.toStringAsFixed(1)}°C');
     }
 
     // Tachycardie importante (>100 bpm = réponse inflammatoire aiguë)
     if (heartRate > 110) {
       pneumoniaRisk += 25;
-      pneumoniaIndicators.add('Tachycardie importante $heartRate bpm (réponse inflammatoire)');
+      pneumoniaIndicators
+          .add('Tachycardie importante $heartRate bpm (réponse inflammatoire)');
     } else if (heartRate > 100) {
       pneumoniaRisk += 20;
       pneumoniaIndicators.add('FC élevée $heartRate bpm');
