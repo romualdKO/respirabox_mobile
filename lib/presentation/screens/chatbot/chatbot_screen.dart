@@ -38,6 +38,10 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   bool _isRecording = false;
   String? _recordingPath;
 
+  // 🆕 SÉPARATION: Transcription vs Analyse toux
+  bool _isRecordingForTranscription = false; // Enregistrement pour parler
+  bool _isRecordingForCough = false; // Enregistrement pour tousser
+
   @override
   void initState() {
     super.initState();
@@ -143,16 +147,60 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
 
   /// Charger une conversation existante
   Future<void> _loadConversation(ConversationModel conversation) async {
-    setState(() {
-      _currentConversation = conversation;
-      _messages.clear();
-      _messages.addAll(conversation.messages.map((m) => ChatMessage(
-            text: m.text,
-            isUser: m.isUser,
-            timestamp: m.timestamp,
-          )));
-    });
-    Navigator.pop(context); // Fermer le drawer
+    try {
+      print('📂 Chargement conversation: ${conversation.id}');
+      
+      // Récupérer l'utilisateur
+      final userAsync = ref.read(currentUserProvider);
+      final user = await userAsync.when(
+        data: (user) => user,
+        loading: () => null,
+        error: (_, __) => null,
+      );
+
+      if (user == null) {
+        print('❌ Impossible de charger: utilisateur non connecté');
+        return;
+      }
+
+      // Désactiver toutes les autres conversations
+      await _conversationService.deactivateAllConversations(user.id);
+      
+      // Activer cette conversation
+      await _conversationService.activateConversation(conversation.id);
+      
+      setState(() {
+        _currentConversation = conversation;
+        _messages.clear();
+        _messages.addAll(conversation.messages.map((m) => ChatMessage(
+              text: m.text,
+              isUser: m.isUser,
+              timestamp: m.timestamp,
+            )));
+      });
+      
+      print('✅ Conversation chargée avec ${conversation.messages.length} messages');
+      
+      if (mounted) {
+        Navigator.pop(context); // Fermer le drawer
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Conversation "${conversation.title}" chargée'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Erreur chargement conversation: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erreur: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   void _addWelcomeMessage() {
@@ -216,6 +264,29 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
         text: userMessage.text,
         isUser: true,
       );
+
+      // 🆕 Mettre à jour le titre si c'est le premier message utilisateur
+      if (_currentConversation!.title == 'Nouvelle conversation' ||
+          _currentConversation!.title.isEmpty) {
+        // Générer un titre à partir du premier message
+        final newTitle = text.length > 40 ? '${text.substring(0, 40)}...' : text;
+        await _conversationService.updateConversationTitle(
+          conversationId: _currentConversation!.id,
+          title: newTitle,
+        );
+        print('✏️ Titre de conversation mis à jour: $newTitle');
+        
+        // Mettre à jour localement aussi
+        _currentConversation = ConversationModel(
+          id: _currentConversation!.id,
+          userId: _currentConversation!.userId,
+          title: newTitle,
+          createdAt: _currentConversation!.createdAt,
+          updatedAt: DateTime.now(),
+          messages: _currentConversation!.messages,
+          isActive: _currentConversation!.isActive,
+        );
+      }
     } else {
       print('⚠️ Aucune conversation active pour sauvegarder le message');
     }
@@ -320,7 +391,140 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     });
   }
 
-  /// 🎤 Démarrer/Arrêter l'enregistrement vocal avec flutter_sound
+  /// 🎤 NOUVEAU: Enregistrement pour TRANSCRIPTION (bouton bleu)
+  Future<void> _toggleVoiceRecording() async {
+    if (_isRecordingForTranscription) {
+      // Arrêter l'enregistrement et transcrire automatiquement
+      final path = await _audioRecorder.stopRecorder();
+      if (path != null) {
+        setState(() {
+          _isRecordingForTranscription = false;
+          _isRecording = false;
+        });
+
+        // Transcrire directement sans dialogue
+        _transcribeAndSend(path);
+      }
+    } else {
+      // Vérifier les permissions
+      final status = await Permission.microphone.request();
+      if (status.isGranted) {
+        // Arrêter l'autre enregistrement si actif
+        if (_isRecordingForCough) {
+          await _audioRecorder.stopRecorder();
+          setState(() {
+            _isRecordingForCough = false;
+          });
+        }
+
+        // Démarrer l'enregistrement
+        final directory = await getApplicationDocumentsDirectory();
+        final filePath =
+            '${directory.path}/voice_${DateTime.now().millisecondsSinceEpoch}.aac';
+
+        await _audioRecorder.startRecorder(
+          toFile: filePath,
+          codec: Codec.aacADTS,
+        );
+
+        setState(() {
+          _isRecordingForTranscription = true;
+          _isRecording = true;
+          _recordingPath = filePath;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.mic, color: Colors.white),
+                SizedBox(width: 8),
+                Text('🎤 Enregistrement vocal (transcription)...'),
+              ],
+            ),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Permission microphone refusée'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 🩺 NOUVEAU: Enregistrement pour ANALYSE TOUX (bouton rouge)
+  Future<void> _toggleCoughRecording() async {
+    if (_isRecordingForCough) {
+      // Arrêter l'enregistrement et analyser automatiquement
+      final path = await _audioRecorder.stopRecorder();
+      if (path != null) {
+        setState(() {
+          _isRecordingForCough = false;
+          _isRecording = false;
+        });
+
+        // Analyser directement sans dialogue
+        _analyzeCoughAndSend(path);
+      }
+    } else {
+      // Vérifier les permissions
+      final status = await Permission.microphone.request();
+      if (status.isGranted) {
+        // Arrêter l'autre enregistrement si actif
+        if (_isRecordingForTranscription) {
+          await _audioRecorder.stopRecorder();
+          setState(() {
+            _isRecordingForTranscription = false;
+          });
+        }
+
+        // Démarrer l'enregistrement
+        final directory = await getApplicationDocumentsDirectory();
+        final filePath =
+            '${directory.path}/cough_${DateTime.now().millisecondsSinceEpoch}.aac';
+
+        await _audioRecorder.startRecorder(
+          toFile: filePath,
+          codec: Codec.aacADTS,
+        );
+
+        setState(() {
+          _isRecordingForCough = true;
+          _isRecording = true;
+          _recordingPath = filePath;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.coronavirus_outlined, color: Colors.white),
+                SizedBox(width: 8),
+                Text('🩺 Enregistrement toux (analyse acoustique)...'),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Permission microphone refusée'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 🎤 ANCIEN: Démarrer/Arrêter l'enregistrement vocal avec flutter_sound
+  /// ⚠️ DÉPRÉCIÉ - Utiliser _toggleVoiceRecording() ou _toggleCoughRecording()
   Future<void> _toggleRecording() async {
     if (_isRecording) {
       // Arrêter l'enregistrement
@@ -378,6 +582,8 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   }
 
   /// 🎯 Afficher options après enregistrement
+  /// ⚠️ DÉPRÉCIÉ - Plus utilisé, remplacé par boutons séparés
+  @deprecated
   void _showAudioOptionsDialog(String audioPath) {
     showDialog(
       context: context,
@@ -560,20 +766,22 @@ Appuyez sur le bouton ci-dessous pour voir l'analyse complète avec graphique co
             isUser: true,
             timestamp: DateTime.now(),
           ));
-          
+
           // Expliquer POURQUOI la toux n'a pas été détectée
           final duration = analysis['duration'] ?? 0.0;
           final energy = analysis['acousticFeatures']?['energy'] ?? 0.0;
-          
+
           String reason = '';
           if (duration < 1.0) {
-            reason = '⏱️ Audio trop court (${duration.toStringAsFixed(1)}s). Enregistrez au moins 1 seconde.';
+            reason =
+                '⏱️ Audio trop court (${duration.toStringAsFixed(1)}s). Enregistrez au moins 1 seconde.';
           } else if (energy < 0.3) {
-            reason = '🔇 Énergie sonore insuffisante (${(energy * 100).toStringAsFixed(0)}%). Toussez plus fort près du micro.';
+            reason =
+                '🔇 Énergie sonore insuffisante (${(energy * 100).toStringAsFixed(0)}%). Toussez plus fort près du micro.';
           } else {
             reason = '🎯 Aucune toux détectée dans le signal audio.';
           }
-          
+
           _messages.add(ChatMessage(
             text: '''❌ Toux non détectée
 
@@ -916,21 +1124,46 @@ $reason
       ),
       child: Row(
         children: [
-          // 🎤 Bouton microphone pour enregistrement vocal
+          // 🎤 NOUVEAU: Bouton microphone VOCAL (transcription) - BLEU
           Container(
             decoration: BoxDecoration(
-              color: _isRecording ? AppColors.error : AppColors.secondary,
+              color: _isRecordingForTranscription
+                  ? Colors.red
+                  : Colors.blue.shade600,
               shape: BoxShape.circle,
             ),
             child: IconButton(
               icon: Icon(
-                _isRecording ? Icons.stop : Icons.mic,
+                _isRecordingForTranscription ? Icons.stop : Icons.mic,
                 color: Colors.white,
+                size: 22,
               ),
-              onPressed: _toggleRecording,
-              tooltip: _isRecording
-                  ? 'Arrêter l\'enregistrement'
-                  : 'Enregistrer un message vocal',
+              onPressed: _toggleVoiceRecording,
+              tooltip: _isRecordingForTranscription
+                  ? 'Arrêter transcription'
+                  : 'Message vocal (texte)',
+            ),
+          ),
+          const SizedBox(width: 6),
+
+          // 🩺 NOUVEAU: Bouton ANALYSE TOUX - ROUGE
+          Container(
+            decoration: BoxDecoration(
+              color: _isRecordingForCough
+                  ? Colors.red.shade900
+                  : Colors.red.shade600,
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: Icon(
+                _isRecordingForCough ? Icons.stop : Icons.coronavirus_outlined,
+                color: Colors.white,
+                size: 22,
+              ),
+              onPressed: _toggleCoughRecording,
+              tooltip: _isRecordingForCough
+                  ? 'Arrêter analyse'
+                  : 'Analyser ma toux',
             ),
           ),
           const SizedBox(width: 8),
@@ -940,7 +1173,9 @@ $reason
               controller: _messageController,
               decoration: InputDecoration(
                 hintText: _isRecording
-                    ? '🎤 Enregistrement...'
+                    ? (_isRecordingForTranscription
+                        ? '🎤 Enregistrement vocal...'
+                        : '🩺 Enregistrement toux...')
                     : 'Posez votre question...',
                 hintStyle: TextStyle(
                   color: _isRecording ? AppColors.error : AppColors.textLight,
@@ -1140,41 +1375,103 @@ $reason
                       final conv = conversations[index];
                       final isActive = conv.id == _currentConversation?.id;
 
-                      return ListTile(
-                        selected: isActive,
-                        selectedTileColor: AppColors.primary.withOpacity(0.1),
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: isActive
-                                ? AppColors.primary
-                                : Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(8),
+                      return Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: isActive
+                              ? Border.all(
+                                  color: AppColors.primary, width: 2)
+                              : null,
+                        ),
+                        child: ListTile(
+                          selected: isActive,
+                          selectedTileColor:
+                              AppColors.primary.withOpacity(0.1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Icon(
-                            Icons.chat_bubble,
-                            color: isActive ? Colors.white : Colors.grey,
-                            size: 20,
+                          leading: Stack(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isActive
+                                      ? AppColors.primary
+                                      : Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.chat_bubble,
+                                  color: isActive ? Colors.white : Colors.grey,
+                                  size: 20,
+                                ),
+                              ),
+                              if (isActive)
+                                Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: Colors.white, width: 2),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                        ),
-                        title: Text(
-                          conv.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight:
-                                isActive ? FontWeight.bold : FontWeight.normal,
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  conv.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: isActive
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                              if (isActive)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Active',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
+                          subtitle: Text(
+                            '${conv.messages.length} messages • ${_formatDate(conv.updatedAt)}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          trailing: isActive
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.delete_outline,
+                                      size: 20, color: Colors.red),
+                                  onPressed: () =>
+                                      _deleteConversation(conv.id),
+                                ),
+                          onTap: isActive ? null : () => _loadConversation(conv),
                         ),
-                        subtitle: Text(
-                          '${conv.messages.length} messages • ${_formatDate(conv.updatedAt)}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 20),
-                          onPressed: () => _deleteConversation(conv.id),
-                        ),
-                        onTap: () => _loadConversation(conv),
                       );
                     },
                   );

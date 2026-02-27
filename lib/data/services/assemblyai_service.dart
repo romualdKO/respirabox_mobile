@@ -254,28 +254,28 @@ class AssemblyAIService {
               // 🧠 ÉTAPE 3: ANALYSE INTELLIGENTE AVEC FEATURES ACOUSTIQUES + CONTEXTE
               // ⚠️ NE DÉPEND PLUS DU TEXTE TRANSCRIT!
               // La détection repose sur: durée, énergie, pics sonores
-              print('🎯 Analyse acoustique (transcription ignorée pour détection):');
+              print(
+                  '🎯 Analyse acoustique (transcription ignorée pour détection):');
               print('   - Texte AssemblyAI: "$text"');
               print('   - Durée audio: ${duration}s');
               print('   - Énergie: ${audioFeatures['energy']}');
-              
+
               final coughAnalysis = CoughAnalysisHelper.analyzeCoughPattern(
-                  text.isEmpty ? 'son non-verbal' : text,
-                  duration,
-                  confidence,
-                  audioFeatures: audioFeatures,
-                  patientContext: patientContext);
+                  text.isEmpty ? 'son non-verbal' : text, duration, confidence,
+                  audioFeatures: audioFeatures, patientContext: patientContext);
 
               print('✅ Résultat analyse:');
               print('   - Toux détectée: ${coughAnalysis['hasCough']}');
               print('   - Type toux: ${coughAnalysis['type']}');
               print('   - Risque TB: ${coughAnalysis['tbRisk']}%');
-              print('   - Risque Pneumonie: ${coughAnalysis['pneumoniaRisk']}%');
+              print(
+                  '   - Risque Pneumonie: ${coughAnalysis['pneumoniaRisk']}%');
               print('   - Niveau urgence: ${coughAnalysis['urgencyLevel']}');
 
               return {
                 'status': 'completed',
-                'hasCough': coughAnalysis['hasCough'], // Basé UNIQUEMENT sur acoustique
+                'hasCough':
+                    coughAnalysis['hasCough'], // Basé UNIQUEMENT sur acoustique
                 'text': text.isEmpty
                     ? '[Son non-verbal - analyse acoustique effectuée]'
                     : text,

@@ -134,19 +134,37 @@ class ConversationService {
   /// Marquer toutes les conversations comme inactives
   Future<void> deactivateAllConversations(String userId) async {
     try {
+      // Récupérer TOUTES les conversations de l'utilisateur (pas de filtre isActive)
       final snapshot = await _firestore
           .collection('conversations')
           .where('userId', isEqualTo: userId)
-          .where('isActive', isEqualTo: true)
           .get();
+
+      print('🔄 Désactivation de ${snapshot.docs.length} conversations...');
 
       final batch = _firestore.batch();
       for (var doc in snapshot.docs) {
         batch.update(doc.reference, {'isActive': false});
       }
       await batch.commit();
+      
+      print('✅ Conversations désactivées');
     } catch (e) {
       print('❌ Erreur désactivation conversations: $e');
+    }
+  }
+
+  /// Activer une conversation spécifique
+  Future<void> activateConversation(String conversationId) async {
+    try {
+      await _firestore.collection('conversations').doc(conversationId).update({
+        'isActive': true,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      print('✅ Conversation $conversationId activée');
+    } catch (e) {
+      print('❌ Erreur activation conversation: $e');
+      rethrow;
     }
   }
 

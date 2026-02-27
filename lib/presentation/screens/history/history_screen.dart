@@ -36,8 +36,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         // Charger les tests de l'utilisateur
         final testsAsync = ref.watch(recentTestsProvider(user.id));
 
+        // 🐛 DEBUG: Log userId pour vérifier
+        print('🔍 HISTORY_SCREEN: userId = ${user.id}');
+
         return testsAsync.when(
           data: (allTests) {
+            // 🐛 DEBUG: Log nombre de tests récupérés
+            print('📊 HISTORY_SCREEN: ${allTests.length} tests récupérés');
+            if (allTests.isNotEmpty) {
+              print('   → Premier test: ID=${allTests.first.id}, Date=${allTests.first.testDate}');
+            }
+
             // Filtrer les tests selon le filtre sélectionné
             final filteredTests = _selectedFilter == 'Tous'
                 ? allTests
@@ -567,24 +576,50 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.history,
-            size: 80,
-            color: AppColors.textLight.withOpacity(0.5),
+            Icons.science_outlined,
+            size: 100,
+            color: AppColors.primary.withOpacity(0.3),
           ),
           const SizedBox(height: 20),
           Text(
-            'Aucun test trouvé',
+            _selectedFilter == 'Tous'
+                ? 'Aucun test effectué'
+                : 'Aucun test trouvé',
             style: AppTextStyles.h3.copyWith(
-              color: AppColors.textLight,
+              color: AppColors.textDark,
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            'Les tests avec ce filtre apparaîtront ici',
-            style: TextStyle(
-              color: AppColors.textLight,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              _selectedFilter == 'Tous'
+                  ? 'Connectez le prototype ESP32 RespiraBox\npour effectuer votre premier test respiratoire.'
+                  : 'Les tests avec le filtre "$_selectedFilter" apparaîtront ici.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textLight,
+                fontSize: 14,
+              ),
             ),
           ),
+          if (_selectedFilter == 'Tous') ...[
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              onPressed: () {
+                // Naviguer vers l'écran de connexion ESP32
+                Navigator.pushNamed(context, '/bluetooth-devices');
+              },
+              icon: const Icon(Icons.bluetooth_searching),
+              label: const Text('Connecter ESP32'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+          ],
         ],
       ),
     );
