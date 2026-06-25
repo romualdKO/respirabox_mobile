@@ -111,7 +111,15 @@ class GeminiAIService {
   /// Mode hors-ligne intelligent — répond sans API via règles médicales
   String _callOffline(String prompt) {
     print('[OfflineAI] Mode hors-ligne activé');
-    final p = prompt.toLowerCase();
+    // Extraire uniquement la question de l'utilisateur (pas tout le prompt système)
+    // Le prompt contient "QUESTION DU PATIENT : "xxx"" — on prend juste ça
+    String userQuestion = prompt;
+    final match = RegExp(r'QUESTION DU PATIENT\s*:\s*"([^"]+)"', caseSensitive: false)
+        .firstMatch(prompt);
+    if (match != null) {
+      userQuestion = match.group(1) ?? prompt;
+    }
+    final p = userQuestion.toLowerCase();
 
     // Urgences
     if (p.contains('spo2') && (p.contains('< 90') || p.contains('90%') || p.contains('hypox'))) {
