@@ -81,7 +81,7 @@ class GeminiAIService {
     final key = AppConstants.cohereApiKey;
     if (key.isEmpty) return _callOffline(prompt);
 
-    final models = ['command-light', 'command', 'command-nightly'];
+    final models = ['command-a-03-2025', 'command-r-plus-08-2024', 'command-r7b-12-2024'];
     for (final model in models) {
       try {
         final response = await http.post(
