@@ -62,16 +62,21 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     await _audioRecorder.openRecorder();
   }
 
+  /// Attend que l'auth soit résolue (max 5s) et retourne l'utilisateur
+  Future<dynamic> _getUser() async {
+    for (int i = 0; i < 10; i++) {
+      final asyncUser = ref.read(currentUserProvider);
+      if (asyncUser is AsyncData) return asyncUser.value;
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!mounted) return null;
+    }
+    return null;
+  }
+
   /// Charger la dernière conversation active ou en créer une nouvelle
   Future<void> _loadOrCreateConversation() async {
     try {
-      final userAsync = ref.read(currentUserProvider);
-
-      final user = await userAsync.when(
-        data: (user) => user,
-        loading: () => null,
-        error: (_, __) => null,
-      );
+      final user = await _getUser();
 
       if (user == null) {
         print('❌ Utilisateur non connecté');
@@ -110,13 +115,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   /// Créer une nouvelle conversation
   Future<void> _createNewConversation() async {
     try {
-      final userAsync = ref.read(currentUserProvider);
-
-      final user = await userAsync.when(
-        data: (user) => user,
-        loading: () => null,
-        error: (_, __) => null,
-      );
+      final user = await _getUser();
 
       if (user == null) {
         print('❌ Impossible de créer conversation: utilisateur non connecté');
@@ -149,14 +148,8 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   Future<void> _loadConversation(ConversationModel conversation) async {
     try {
       print('📂 Chargement conversation: ${conversation.id}');
-      
-      // Récupérer l'utilisateur
-      final userAsync = ref.read(currentUserProvider);
-      final user = await userAsync.when(
-        data: (user) => user,
-        loading: () => null,
-        error: (_, __) => null,
-      );
+
+      final user = await _getUser();
 
       if (user == null) {
         print('❌ Impossible de charger: utilisateur non connecté');
@@ -292,80 +285,64 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     }
 
     try {
-      // Récupérer l'utilisateur actuel
-      final userAsync = ref.read(currentUserProvider);
+      final user = await _getUser();
 
-      userAsync.when(
-        data: (user) async {
-          if (user == null) {
-            setState(() {
-              _messages.add(ChatMessage(
-                text:
-                    '❌ Veuillez vous connecter pour utiliser l\'assistant IA.',
-                isUser: false,
-                timestamp: DateTime.now(),
-              ));
-              _isTyping = false;
-            });
-            return;
-          }
-
-          // L'assistant médical répond intelligemment à tout
-          // Elle analyse automatiquement l'intention de l'utilisateur
-          String botResponse = await _geminiService.sendMessage(
-            userMessage: text,
-            userId: user.id,
-          );
-
-          final botMessage = ChatMessage(
-            text: botResponse,
+      if (user == null) {
+        setState(() {
+          _messages.add(ChatMessage(
+            text: '❌ Veuillez vous connecter pour utiliser l\'assistant IA.',
             isUser: false,
             timestamp: DateTime.now(),
-          );
+          ));
+          _isTyping = false;
+        });
+        return;
+      }
 
-          setState(() {
-            _messages.add(botMessage);
-            _isTyping = false;
-          });
+      // Construire l'historique des 6 derniers échanges (hors message d'accueil)
+      final recentMsgs = _messages
+          .where((m) =>
+              !m.text.startsWith('🤖 Bonjour') &&
+              !m.text.startsWith('🤖 Bon après') &&
+              !m.text.startsWith('🤖 Bonsoir'))
+          .toList();
+      const _kHistoryContextWindow = 6;
+      final historySlice = recentMsgs.length > _kHistoryContextWindow
+          ? recentMsgs.sublist(recentMsgs.length - _kHistoryContextWindow)
+          : recentMsgs;
+      final history = historySlice
+          .map((m) => {'role': m.isUser ? 'user' : 'assistant', 'text': m.text})
+          .toList();
 
-          // Sauvegarder la réponse de l'IA dans la conversation
-          if (_currentConversation != null) {
-            print(
-                '💾 Sauvegarde réponse IA dans conversation: ${_currentConversation!.id}');
-            await _conversationService.addMessage(
-              conversationId: _currentConversation!.id,
-              text: botMessage.text,
-              isUser: false,
-            );
-          } else {
-            print(
-                '⚠️ Aucune conversation active pour sauvegarder la réponse IA');
-          }
-
-          _scrollToBottom();
-        },
-        loading: () {
-          setState(() {
-            _messages.add(ChatMessage(
-              text: '⏳ Chargement de votre profil...',
-              isUser: false,
-              timestamp: DateTime.now(),
-            ));
-            _isTyping = false;
-          });
-        },
-        error: (error, stack) {
-          setState(() {
-            _messages.add(ChatMessage(
-              text: '❌ Erreur: $error',
-              isUser: false,
-              timestamp: DateTime.now(),
-            ));
-            _isTyping = false;
-          });
-        },
+      final String botResponse = await _geminiService.sendMessage(
+        userMessage: text,
+        userId: user.id,
+        history: history,
       );
+
+      final botMessage = ChatMessage(
+        text: botResponse,
+        isUser: false,
+        timestamp: DateTime.now(),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _messages.add(botMessage);
+        _isTyping = false;
+      });
+
+      if (_currentConversation != null) {
+        await _conversationService.addMessage(
+          conversationId: _currentConversation!.id,
+          text: botMessage.text,
+          isUser: false,
+        );
+      }
+
+      _scrollToBottom();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _messages.add(ChatMessage(
           text: '❌ Une erreur s\'est produite: $e',
@@ -458,9 +435,154 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   }
 
   /// 🩺 NOUVEAU: Enregistrement pour ANALYSE TOUX (bouton rouge)
+  /// Questionnaire clinique complet (WHO TB screen + PSI Pneumonie + épidémio)
+  Future<Map<String, dynamic>?> _showSymptomQuestionnaire() async {
+    int durationDays = 3;
+    bool hasFever = false;
+    bool hasNightSweats = false;
+    bool hasWeightLoss = false;
+    bool hasChestPain = false;
+    bool hasDyspnea = false;
+    bool tbContact = false;
+    bool isImmunocompromised = false;
+
+    return showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Bilan clinique pré-analyse',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Durée toux
+                const Text('Durée de la toux',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Row(children: [
+                  Expanded(
+                    child: Slider(
+                      value: durationDays.toDouble(),
+                      min: 1, max: 60, divisions: 59,
+                      label: '$durationDays j',
+                      activeColor: durationDays >= 14 ? Colors.red : Colors.blue,
+                      onChanged: (v) => setDialogState(() => durationDays = v.round()),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: durationDays >= 21 ? Colors.red.shade100
+                          : durationDays >= 14 ? Colors.orange.shade100
+                          : Colors.green.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('$durationDays j',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: durationDays >= 21 ? Colors.red.shade800
+                              : durationDays >= 14 ? Colors.orange.shade800
+                              : Colors.green.shade800,
+                        )),
+                  ),
+                ]),
+                if (durationDays >= 14)
+                  Text('  ⚠️ Toux chronique — critère TB (WHO)',
+                      style: TextStyle(fontSize: 11, color: Colors.red.shade700)),
+                const Divider(height: 20),
+
+                // Symptômes cliniques
+                const Text('Symptômes présents',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                _symptomTile('Fièvre (>38°C)', hasFever,
+                    (v) => setDialogState(() => hasFever = v)),
+                _symptomTile('Sueurs nocturnes', hasNightSweats,
+                    (v) => setDialogState(() => hasNightSweats = v)),
+                _symptomTile('Perte de poids inexpliquée', hasWeightLoss,
+                    (v) => setDialogState(() => hasWeightLoss = v)),
+                _symptomTile('Douleur thoracique', hasChestPain,
+                    (v) => setDialogState(() => hasChestPain = v)),
+                _symptomTile('Essoufflement / dyspnée', hasDyspnea,
+                    (v) => setDialogState(() => hasDyspnea = v)),
+                const Divider(height: 20),
+
+                // Facteurs de risque épidémiologiques
+                const Text('Facteurs de risque',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                _symptomTile('Contact avec un cas de TB connu', tbContact,
+                    (v) => setDialogState(() => tbContact = v)),
+                _symptomTile('Immunodéprimé (VIH, chimio, corticoïdes)',
+                    isImmunocompromised,
+                    (v) => setDialogState(() => isImmunocompromised = v)),
+
+                // Résumé WHO
+                const SizedBox(height: 8),
+                Builder(builder: (_) {
+                  int whoCount = 0;
+                  if (durationDays >= 2) whoCount++;
+                  if (hasFever) whoCount++;
+                  if (hasNightSweats) whoCount++;
+                  if (hasWeightLoss) whoCount++;
+                  if (whoCount == 0) return const SizedBox.shrink();
+                  return Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: whoCount >= 2 ? Colors.red.shade50 : Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: whoCount >= 2 ? Colors.red : Colors.orange),
+                    ),
+                    child: Text(
+                      'WHO TB screen : $whoCount/4 symptômes\n'
+                      '${whoCount >= 2 ? "⚠️ Investigation TB recommandée" : "Surveillance conseillée"}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: whoCount >= 2 ? Colors.red.shade800 : Colors.orange.shade800,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, null),
+              child: const Text('Passer'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.biotech, size: 16),
+              onPressed: () => Navigator.pop(ctx, {
+                'symptomDurationDays': durationDays,
+                'hasFever': hasFever,
+                'hasNightSweats': hasNightSweats,
+                'hasWeightLoss': hasWeightLoss,
+                'hasChestPain': hasChestPain,
+                'hasDyspnea': hasDyspnea,
+                'tbContact': tbContact,
+                'isImmunocompromised': isImmunocompromised,
+              }),
+              label: const Text('Analyser'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _symptomTile(String label, bool value, ValueChanged<bool> onChanged) {
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
+        Switch(value: value, onChanged: onChanged),
+      ],
+    );
+  }
+
   Future<void> _toggleCoughRecording() async {
     if (_isRecordingForCough) {
-      // Arrêter l'enregistrement et analyser automatiquement
+      // Arrêter l'enregistrement
       final path = await _audioRecorder.stopRecorder();
       if (path != null) {
         setState(() {
@@ -468,8 +590,9 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
           _isRecording = false;
         });
 
-        // Analyser directement sans dialogue
-        _analyzeCoughAndSend(path);
+        // Questionnaire clinique avant analyse
+        final symptoms = await _showSymptomQuestionnaire();
+        _analyzeCoughAndSend(path, symptoms: symptoms);
       }
     } else {
       // Vérifier les permissions
@@ -483,14 +606,16 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
           });
         }
 
-        // Démarrer l'enregistrement
+        // Enregistrer en PCM/WAV pour que l'extracteur acoustique puisse lire les samples
         final directory = await getApplicationDocumentsDirectory();
         final filePath =
-            '${directory.path}/cough_${DateTime.now().millisecondsSinceEpoch}.aac';
+            '${directory.path}/cough_${DateTime.now().millisecondsSinceEpoch}.wav';
 
         await _audioRecorder.startRecorder(
           toFile: filePath,
-          codec: Codec.aacADTS,
+          codec: Codec.pcm16WAV,
+          sampleRate: 44100,
+          numChannels: 1,
         );
 
         setState(() {
@@ -523,115 +648,6 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     }
   }
 
-  /// 🎤 ANCIEN: Démarrer/Arrêter l'enregistrement vocal avec flutter_sound
-  /// ⚠️ DÉPRÉCIÉ - Utiliser _toggleVoiceRecording() ou _toggleCoughRecording()
-  Future<void> _toggleRecording() async {
-    if (_isRecording) {
-      // Arrêter l'enregistrement
-      final path = await _audioRecorder.stopRecorder();
-      if (path != null) {
-        setState(() {
-          _isRecording = false;
-          _recordingPath = path;
-        });
-
-        // Afficher dialogue: transcription ou analyse de toux
-        _showAudioOptionsDialog(path);
-      }
-    } else {
-      // Vérifier les permissions
-      final status = await Permission.microphone.request();
-      if (status.isGranted) {
-        // Démarrer l'enregistrement
-        final directory = await getApplicationDocumentsDirectory();
-        final filePath =
-            '${directory.path}/recording_${DateTime.now().millisecondsSinceEpoch}.aac';
-
-        await _audioRecorder.startRecorder(
-          toFile: filePath,
-          codec: Codec.aacADTS,
-        );
-
-        setState(() {
-          _isRecording = true;
-          _recordingPath = filePath;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.mic, color: Colors.white),
-                SizedBox(width: 8),
-                Text('🎤 Enregistrement en cours...'),
-              ],
-            ),
-            backgroundColor: AppColors.error,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Permission microphone refusée'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  /// 🎯 Afficher options après enregistrement
-  /// ⚠️ DÉPRÉCIÉ - Plus utilisé, remplacé par boutons séparés
-  @deprecated
-  void _showAudioOptionsDialog(String audioPath) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.audiotrack, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('Audio enregistré'),
-          ],
-        ),
-        content: const Text('Que voulez-vous faire avec cet audio ?'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _transcribeAndSend(audioPath);
-            },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.chat_bubble_outline),
-                SizedBox(width: 4),
-                Text('Transcrire en texte'),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _analyzeCoughAndSend(audioPath);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.healing),
-                SizedBox(width: 4),
-                Text('Analyser la toux'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// 📝 Transcrire l'audio en texte et envoyer
   Future<void> _transcribeAndSend(String audioPath) async {
@@ -681,11 +697,12 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   }
 
   /// 🩺 Analyser la toux et envoyer à l'IA
-  Future<void> _analyzeCoughAndSend(String audioPath) async {
+  Future<void> _analyzeCoughAndSend(String audioPath,
+      {Map<String, dynamic>? symptoms}) async {
     setState(() {
       _isTyping = true;
       _messages.add(ChatMessage(
-        text: '🩺 Analyse acoustique avancée en cours (FFT, MFCC, spectral)...',
+        text: '🩺 Analyse clinique en cours (acoustique + symptômes + vitales)...',
         isUser: false,
         timestamp: DateTime.now(),
       ));
@@ -693,22 +710,19 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     _scrollToBottom();
 
     try {
-      // 🆕 RÉCUPÉRATION CONTEXTE PATIENT COMPLET
-      print('🔍 Récupération contexte patient...');
-      Map<String, dynamic>? patientContext = await _buildPatientContext();
+      // Contexte patient (vitales ESP32 + profil Firestore)
+      Map<String, dynamic> patientContext =
+          await _buildPatientContext() ?? {};
 
-      if (patientContext != null && patientContext.isNotEmpty) {
-        print(
-            '✅ Contexte patient récupéré avec ${patientContext.keys.length} paramètres');
-        if (patientContext.containsKey('spo2')) {
-          print('   → Mesures vitales récentes utilisées!');
-        }
+      // Fusionner les symptômes déclarés par le patient
+      if (symptoms != null) {
+        patientContext.addAll(symptoms);
       }
 
-      // 🎵 ANALYSE AVEC FEATURES ACOUSTIQUES + CONTEXTE PATIENT
+      // 🎵 ANALYSE COMPLÈTE : acoustique + symptômes + vitales
       final analysis = await _assemblyAIService.analyzeCough(
         audioPath,
-        patientContext: patientContext,
+        patientContext: patientContext.isEmpty ? null : patientContext,
       );
 
       // Retirer le message de chargement
@@ -1088,23 +1102,26 @@ $reason
   Widget _buildTypingDot(int index) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeInOut,
       builder: (context, value, child) {
-        final delay = index * 0.2;
-        final animValue = ((value - delay).clamp(0.0, 1.0));
-        return Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.3 + (animValue * 0.7)),
-            shape: BoxShape.circle,
+        final delay = index * 0.33;
+        final phase = ((value - delay).clamp(0.0, 1.0));
+        final bounce = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+        return Transform.translate(
+          offset: Offset(0, -6 * bounce),
+          child: Container(
+            width: 9,
+            height: 9,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.4 + bounce * 0.6),
+              shape: BoxShape.circle,
+            ),
           ),
         );
       },
       onEnd: () {
-        if (mounted && _isTyping) {
-          setState(() {});
-        }
+        if (mounted && _isTyping) setState(() {});
       },
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
@@ -169,7 +170,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  void _navigateToWelcome() {
+  Future<void> _navigateToWelcome() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_complete', true);
+    if (!mounted) return;
     Navigator.pushReplacementNamed(context, AppRoutes.welcome);
   }
 }

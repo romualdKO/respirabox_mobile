@@ -1,3 +1,7 @@
+# Secrets — ne jamais commiter
+dart_defines.json
+.env
+
 # Miscellaneous
 *.class
 *.log

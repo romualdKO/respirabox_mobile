@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../models/test_result_model.dart';
 
 /// 🧪 SERVICE DE GESTION DES TESTS RESPIRATOIRES
@@ -21,34 +22,20 @@ class TestService {
   /// 📋 RÉCUPÉRER TOUS LES TESTS D'UN UTILISATEUR
   Future<List<TestResultModel>> getUserTests(String userId) async {
     try {
-      print('🔍 Récupération tests pour userId: $userId');
+      if (kDebugMode) print('🔍 Récupération tests pour userId: $userId');
 
       final querySnapshot = await _testsCollection
           .where('userId', isEqualTo: userId)
           .orderBy('testDate', descending: true)
           .get();
 
-      print('📊 Nombre de tests trouvés: ${querySnapshot.docs.length}');
-
-      // Afficher détails des tests
-      if (querySnapshot.docs.isNotEmpty) {
-        print('✅ Tests récupérés:');
-        for (var i = 0; i < querySnapshot.docs.length && i < 3; i++) {
-          final doc = querySnapshot.docs[i];
-          final data = doc.data() as Map<String, dynamic>;
-          print('   Test ${i + 1}:');
-          print('     - ID: ${doc.id}');
-          print('     - Date: ${data['testDate']}');
-          print('     - SpO2: ${data['spo2']}%');
-          print('     - FC: ${data['heartRate']} bpm');
-          print('     - Score: ${data['riskScore']}');
+      if (kDebugMode) {
+        print('📊 Nombre de tests trouvés: ${querySnapshot.docs.length}');
+        if (querySnapshot.docs.isNotEmpty) {
+          print('✅ Tests récupérés (${querySnapshot.docs.length} total)');
+        } else {
+          print('⚠️ Aucun test trouvé pour cet utilisateur dans Firestore.');
         }
-        if (querySnapshot.docs.length > 3) {
-          print('   ... et ${querySnapshot.docs.length - 3} autres');
-        }
-      } else {
-        print('⚠️ Aucun test trouvé pour cet utilisateur dans Firestore!');
-        print('   Vérifiez que userId correspond aux tests sauvegardés.');
       }
 
       return querySnapshot.docs
@@ -97,7 +84,7 @@ class TestService {
   Future<List<TestResultModel>> getRecentTests(String userId,
       {int limit = 5}) async {
     try {
-      print('🔍 Récupération des $limit derniers tests pour userId: $userId');
+      if (kDebugMode) print('🔍 getRecentTests: $limit tests pour $userId');
 
       final querySnapshot = await _testsCollection
           .where('userId', isEqualTo: userId)
@@ -105,24 +92,13 @@ class TestService {
           .limit(limit)
           .get();
 
-      print('📊 Tests récents trouvés: ${querySnapshot.docs.length}');
-
-      // Debug: afficher les IDs des tests
-      if (querySnapshot.docs.isNotEmpty) {
-        print('✅ IDs des tests:');
-        for (var doc in querySnapshot.docs) {
-          print('   - ${doc.id}');
-        }
-      } else {
-        print('⚠️ Aucun test récent trouvé!');
-      }
+      if (kDebugMode) print('📊 Tests récents: ${querySnapshot.docs.length}');
 
       return querySnapshot.docs
           .map((doc) => TestResultModel.fromFirestore(doc))
           .toList();
-    } catch (e, stackTrace) {
+    } catch (e) {
       print('❌ Erreur récupération tests récents: $e');
-      print('Stack: $stackTrace');
       throw 'Erreur lors de la récupération des tests récents: $e';
     }
   }
@@ -161,12 +137,18 @@ class TestService {
             .toList());
   }
 
-  /// 📊 RÉCUPÉRER LES STATISTIQUES
+  /// RÉCUPÉRER LES STATISTIQUES
+  /// Utilise deux requêtes ciblées au lieu de charger tous les tests.
   Future<TestStatistics> getUserStatistics(String userId) async {
     try {
-      final tests = await getUserTests(userId);
+      // Requête 1 : Count + dernier test (pour score récent + date)
+      final recentSnap = await _testsCollection
+          .where('userId', isEqualTo: userId)
+          .orderBy('testDate', descending: true)
+          .limit(50)  // Limité à 50 pour le calcul de la moyenne
+          .get();
 
-      if (tests.isEmpty) {
+      if (recentSnap.docs.isEmpty) {
         return TestStatistics(
           totalTests: 0,
           averageScore: 0,
@@ -175,21 +157,32 @@ class TestService {
         );
       }
 
-      final totalTests = tests.length;
-      final averageScore =
-          tests.map((t) => t.riskScore).reduce((a, b) => a + b) / totalTests;
-      final lastTestDate = tests.first.testDate;
+      final tests = recentSnap.docs
+          .map((doc) => TestResultModel.fromFirestore(doc))
+          .toList();
 
-      // Calcul du taux d'amélioration (comparison premier vs dernier test)
+      final totalFetched  = tests.length;
+      final averageScore  = tests.map((t) => t.riskScore).reduce((a, b) => a + b) / totalFetched;
+      final lastTestDate  = tests.first.testDate;
+
+      // Taux d'amélioration : premier vs dernier test disponible
       double improvementRate = 0;
       if (tests.length >= 2) {
         final firstScore = tests.last.riskScore;
-        final lastScore = tests.first.riskScore;
-        improvementRate = ((firstScore - lastScore) / firstScore) * 100;
+        final lastScore  = tests.first.riskScore;
+        if (firstScore > 0) {
+          improvementRate = ((firstScore - lastScore) / firstScore) * 100;
+        }
       }
 
+      // Requête 2 : Compte total réel (agrégation légère)
+      final countSnap = await _testsCollection
+          .where('userId', isEqualTo: userId)
+          .count()
+          .get();
+
       return TestStatistics(
-        totalTests: totalTests,
+        totalTests: countSnap.count ?? totalFetched,
         averageScore: averageScore,
         lastTestDate: lastTestDate,
         improvementRate: improvementRate,

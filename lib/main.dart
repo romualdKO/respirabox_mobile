@@ -3,19 +3,26 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/config/firebase_config.dart';
 import 'core/config/theme_config.dart';
+import 'data/services/notification_service.dart';
 import 'routes/app_routes.dart';
 
-/// 🚀 POINT D'ENTRÉE DE L'APPLICATION RESPIRABOX
+/// POINT D'ENTRÉE DE L'APPLICATION RESPIRABOX
 void main() async {
-  // ✅ Initialisation des services Flutter
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔥 Initialisation de Firebase
+  // Chargement des clés API depuis .env
+  await dotenv.load(fileName: '.env');
+
+  // Initialisation Firebase
   await Firebase.initializeApp(
     options: FirebaseConfig.firebaseOptions,
   );
+
+  // Initialisation FCM (notifications push)
+  await NotificationService().initFCM();
 
   // 📱 Configuration de l'orientation (portrait uniquement)
   await SystemChrome.setPreferredOrientations([

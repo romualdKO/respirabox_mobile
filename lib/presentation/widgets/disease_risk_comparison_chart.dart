@@ -24,7 +24,6 @@ class DiseaseRiskComparisonChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Extraire données de comparaison
     final diseaseComparison =
         coughAnalysis['diseaseComparison'] as Map<String, dynamic>?;
 
@@ -46,178 +45,151 @@ class DiseaseRiskComparisonChart extends StatelessWidget {
     final pneumoniaPercentage =
         (pneumoniaData['percentage'] as num?)?.toInt() ?? 0;
 
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 🏷️ TITRE
-            Row(
-              children: [
-                const Icon(Icons.analytics, color: Color(0xFF2196F3), size: 28),
-                const SizedBox(width: 12),
-                const Text(
-                  'Comparaison Risques Maladies',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Analyse basée sur caractéristiques acoustiques et contexte médical',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            const SizedBox(height: 24),
+    // Hauteur minimale visible pour les barres même à score=0
+    final tbBar = tbScore < 3 ? 3.0 : tbScore.clamp(0.0, 100.0);
+    final pneumoniaBar = pneumoniaScore < 3 ? 3.0 : pneumoniaScore.clamp(0.0, 100.0);
 
-            // 📊 GRAPHIQUE
-            SizedBox(
-              height: height,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceEvenly,
-                  maxY: 100,
-                  minY: 0,
-                  barTouchData: BarTouchData(
-                    enabled: true,
-                    touchTooltipData: BarTouchTooltipData(
-                      tooltipBgColor: Colors.black87,
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        final disease =
-                            group.x == 0 ? 'Tuberculose' : 'Pneumonie';
-                        final score = rod.toY.toInt();
-                        return BarTooltipItem(
-                          '$disease\n$score/100',
-                          const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 60,
-                        getTitlesWidget: (value, meta) {
-                          return _buildBottomTitle(
-                            value.toInt(),
-                            tbScore,
-                            pneumoniaScore,
-                            tbPercentage,
-                            pneumoniaPercentage,
-                          );
-                        },
+    // Pas de Card — le parent (_buildDiseaseRiskPrediction) fournit déjà le Card
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 📊 GRAPHIQUE
+        SizedBox(
+          height: height,
+          child: BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceEvenly,
+              maxY: 100,
+              minY: 0,
+              barTouchData: BarTouchData(
+                enabled: true,
+                touchTooltipData: BarTouchTooltipData(
+                  tooltipBgColor: Colors.black87,
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    final disease =
+                        group.x == 0 ? 'Tuberculose' : 'Pneumonie';
+                    final score = group.x == 0
+                        ? tbScore.toInt()
+                        : pneumoniaScore.toInt();
+                    return BarTooltipItem(
+                      '$disease\n$score/100',
+                      const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 45,
-                        interval: 20,
-                        getTitlesWidget: (value, meta) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Text(
-                              '${value.toInt()}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                  ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: 20,
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: Colors.grey.shade300,
-                        strokeWidth: 1,
-                        dashArray: [5, 5],
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                show: true,
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 72,
+                    getTitlesWidget: (value, meta) {
+                      return _buildBottomTitle(
+                        value.toInt(),
+                        tbScore,
+                        pneumoniaScore,
+                        tbPercentage,
+                        pneumoniaPercentage,
                       );
                     },
                   ),
-                  borderData: FlBorderData(
-                    show: true,
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey.shade400, width: 1),
-                      left: BorderSide(color: Colors.grey.shade400, width: 1),
-                    ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    interval: 25,
+                    getTitlesWidget: (value, meta) {
+                      return Text(
+                        '${value.toInt()}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
                   ),
-                  barGroups: [
-                    // 🔴 TUBERCULOSE
-                    BarChartGroupData(
-                      x: 0,
-                      barRods: [
-                        BarChartRodData(
-                          toY: tbScore.clamp(0, 100),
-                          color: _getRiskColor(tbScore),
-                          width: 60,
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(8),
-                          ),
-                          backDrawRodData: BackgroundBarChartRodData(
-                            show: true,
-                            toY: 100,
-                            color: Colors.grey.shade200,
-                          ),
-                        ),
-                      ],
-                    ),
-                    // 🔵 PNEUMONIE
-                    BarChartGroupData(
-                      x: 1,
-                      barRods: [
-                        BarChartRodData(
-                          toY: pneumoniaScore.clamp(0, 100),
-                          color: _getRiskColor(pneumoniaScore),
-                          width: 60,
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(8),
-                          ),
-                          backDrawRodData: BackgroundBarChartRodData(
-                            show: true,
-                            toY: 100,
-                            color: Colors.grey.shade200,
-                          ),
-                        ),
-                      ],
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: 25,
+                getDrawingHorizontalLine: (value) => FlLine(
+                  color: Colors.grey.shade200,
+                  strokeWidth: 1,
+                  dashArray: [4, 4],
+                ),
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey.shade400, width: 1),
+                  left: BorderSide(color: Colors.grey.shade400, width: 1),
+                ),
+              ),
+              barGroups: [
+                BarChartGroupData(
+                  x: 0,
+                  barRods: [
+                    BarChartRodData(
+                      toY: tbBar,
+                      color: _getRiskColor(tbScore),
+                      width: 55,
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(8)),
+                      backDrawRodData: BackgroundBarChartRodData(
+                        show: true,
+                        toY: 100,
+                        color: Colors.grey.shade100,
+                      ),
                     ),
                   ],
                 ),
-              ),
+                BarChartGroupData(
+                  x: 1,
+                  barRods: [
+                    BarChartRodData(
+                      toY: pneumoniaBar,
+                      color: _getRiskColor(pneumoniaScore),
+                      width: 55,
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(8)),
+                      backDrawRodData: BackgroundBarChartRodData(
+                        show: true,
+                        toY: 100,
+                        color: Colors.grey.shade100,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-
-            const SizedBox(height: 24),
-
-            // 🎯 INDICATEURS PRIMAIRES
-            _buildIndicatorsSections(tbData, pneumoniaData),
-          ],
+          ),
         ),
-      ),
+
+        const SizedBox(height: 16),
+
+        // Légende + indicateurs
+        _buildLegend(),
+        if ((tbData['primaryIndicators'] as List?)?.isNotEmpty == true ||
+            (pneumoniaData['primaryIndicators'] as List?)?.isNotEmpty == true) ...[
+          const SizedBox(height: 12),
+          const Divider(),
+          const SizedBox(height: 8),
+          _buildIndicatorsSections(tbData, pneumoniaData),
+        ],
+      ],
     );
   }
 

@@ -1,60 +1,78 @@
-/// 🔧 CONSTANTES GLOBALES DE L'APPLICATION RESPIRABOX
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+/// CONSTANTES GLOBALES DE L'APPLICATION RESPIRABOX
 class AppConstants {
-  // 📱 INFORMATIONS APPLICATION
-  static const String appName = 'RespiraBox';
-  static const String appVersion = '1.0.0';
+  // ── APPLICATION ──────────────────────────────────────────────
+  static const String appName     = 'RespiraBox';
+  static const String appVersion  = '2.0.0';
   static const String appSubtitle = 'Surveillance Respiratoire';
-  
-  // ⏱️ SPLASH SCREEN
-  static const int splashScreenDuration = 3; // secondes
-  
-  // 🔥 FIREBASE - COLLECTIONS FIRESTORE
-  static const String usersCollection = 'users';
-  static const String devicesCollection = 'devices';
-  static const String testsCollection = 'user_tests';
-  static const String environmentalDataCollection = 'environmental_data';
-  static const String chatCollection = 'chat_conversations';
-  static const String notificationsCollection = 'notifications';
-  static const String alertsCollection = 'system_alerts';
-  
-  // 🤖 GEMINI AI - Configuration
-  static const String geminiApiKey = 'VOTRE_CLE_API_GEMINI'; // ⚠️ À configurer plus tard
-  static const String geminiModel = 'gemini-pro';
-  
-  // 🫁 TEST RESPIRATOIRE - Paramètres
-  static const int testDurationSeconds = 10; // Durée du test de souffle
-  static const int testSteps = 4; // Nombre d'étapes dans le test
+
+  // ── SPLASH SCREEN ────────────────────────────────────────────
+  static const int splashScreenDuration = 3;
+
+  // ── FIRESTORE — COLLECTIONS ──────────────────────────────────
+  static const String usersCollection           = 'users';
+  static const String devicesCollection         = 'devices';
+  static const String testsCollection           = 'tests';
+  static const String conversationsCollection   = 'conversations';
+  static const String notificationsCollection   = 'notifications';
+
+  // ── GOOGLE GEMINI AI ─────────────────────────────────────────
+  static String get geminiApiKey =>
+      dotenv.env['GEMINI_API_KEY'] ?? '';
+  static const String geminiModel = 'gemini-2.0-flash';
+
+  // ── COHERE AI (fallback) ──────────────────────────────────────
+  static String get cohereApiKey =>
+      dotenv.env['COHERE_API_KEY'] ?? '';
+  static const String cohereApiUrl = 'https://api.cohere.ai/v1/chat';
+
+  // ── ASSEMBLYAI ───────────────────────────────────────────────
+  static String get assemblyAiApiKey =>
+      dotenv.env['ASSEMBLYAI_API_KEY'] ?? '';
+
+  // ── OPENWEATHERMAP ───────────────────────────────────────────
+  static String get openWeatherApiKey =>
+      dotenv.env['OPENWEATHER_API_KEY'] ?? '';
+  static const String openWeatherBaseUrl =
+      'https://api.openweathermap.org/data/2.5';
+  static const double defaultLatitude  = 5.3484; // Abidjan, Côte d'Ivoire
+  static const double defaultLongitude = -4.0167;
+
+  // ── TEST RESPIRATOIRE ────────────────────────────────────────
+  static const int testDurationSeconds = 30;
+  static const int testSteps           = 4;
   static const List<String> testStepTitles = [
     'Préparation',
     'Positionnement',
     'Respiration',
-    'Analyse'
+    'Analyse',
   ];
-  
-  // 📶 BLUETOOTH - Configuration
-  static const String respiraBoxDevicePrefix = 'RespiraBox'; // Préfixe des boîtiers
-  static const int bluetoothScanDuration = 30; // Secondes
-  
-  // 📊 LIMITES & SEUILS
-  static const int maxChatMessages = 50;
-  static const int maxTestHistory = 100;
+
+  // ── BLUETOOTH ────────────────────────────────────────────────
+  static const String respiraBoxDevicePrefix = 'RespiraBox';
+  static const int    bluetoothScanDuration  = 15;
+
+  // ── LIMITES UI ───────────────────────────────────────────────
+  static const int maxChatMessages  = 50;
+  static const int maxTestHistory   = 100;
   static const int minPasswordLength = 8;
-  
-  // 🏥 SEUILS MÉDICAUX (pour analyse des résultats)
-  static const double spo2Normal = 95.0; // SpO2 minimum normal (%)
-  static const double tempNormal = 37.5; // Température maximum normale (°C)
-  static const int pulseNormalMin = 60; // Pouls minimum normal (BPM)
-  static const int pulseNormalMax = 100; // Pouls maximum normal (BPM)
-  
-  // 🚨 SCORES DE RISQUE (%)
-  static const double riskLowThreshold = 30.0; // < 30% = Risque faible
-  static const double riskMediumThreshold = 70.0; // 30-70% = Risque moyen
-  // > 70% = Risque élevé
-  
-  // 🌍 LOCALISATION (Côte d'Ivoire)
+
+  // ── SEUILS MÉDICAUX ──────────────────────────────────────────
+  static const double spo2Normal    = 95.0;
+  static const double tempNormal    = 37.5;
+  static const double tempFever     = 38.5;
+  static const int    pulseNormalMin = 60;
+  static const int    pulseNormalMax = 100;
+
+  // ── SCORES DE RISQUE ─────────────────────────────────────────
+  static const double riskLowThreshold    = 30.0;
+  static const double riskMediumThreshold = 70.0;
+
+  // ── LOCALISATION ─────────────────────────────────────────────
   static const String defaultCountryCode = '+225';
-  static const String defaultLanguage = 'fr'; // Français
-  
-  // ⏱️ DÉLAIS
-  static const int debounceDelay = 500; // Millisecondes
+  static const String defaultLanguage    = 'fr';
+
+  // ── DÉLAIS ───────────────────────────────────────────────────
+  static const int debounceDelay = 500;
 }

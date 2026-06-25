@@ -15,11 +15,15 @@ import 'audio_features_extractor.dart';
 /// - Type de toux (sèche vs grasse)
 class CoughAnalysisHelper {
   /// Analyser le pattern de toux avec scoring médical AVANCÉ
-  /// Intègre données acoustiques + transcription + contexte patient
+  /// [audioDuration] = durée de l'enregistrement audio en secondes (AssemblyAI)
+  /// [symptomDurationDays] = durée des symptômes déclarée par le patient en JOURS
   static Map<String, dynamic> analyzeCoughPattern(
-      String text, double duration, double confidence,
+      String text, double audioDuration, double confidence,
       {Map<String, dynamic>? audioFeatures,
-      Map<String, dynamic>? patientContext}) {
+      Map<String, dynamic>? patientContext,
+      int symptomDurationDays = 0}) {
+    // Durée audio (secondes) — pour calculs acoustiques uniquement
+    final double duration = audioDuration;
     final lowerText = text.toLowerCase();
 
     // ========================================
@@ -36,13 +40,25 @@ class CoughAnalysisHelper {
         audioFeatures?['mfcc'] ?? []; // Mel-Frequency Cepstral Coefficients
     Map<String, double> spectralFeatures = audioFeatures?['spectral'] ?? {};
 
-    // Contexte patient (pour scoring personnalisé)
+    // Contexte patient — vitales ESP32 + profil Firestore
     int? patientAge = patientContext?['age'];
     String? patientGender = patientContext?['gender'];
     double? currentSpO2 = patientContext?['spo2'];
     double? currentTemp = patientContext?['temperature'];
     int? currentHR = patientContext?['heartRate'];
     List<String> medicalConditions = patientContext?['medicalConditions'] ?? [];
+
+    // Symptômes déclarés par le patient (questionnaire pré-analyse)
+    final bool hasFever = patientContext?['hasFever'] == true ||
+        (currentTemp != null && currentTemp > 38.0);
+    final bool hasNightSweats = patientContext?['hasNightSweats'] == true;
+    final bool hasWeightLoss = patientContext?['hasWeightLoss'] == true;
+    final bool hasChestPain = patientContext?['hasChestPain'] == true;
+    final bool hasDyspnea = patientContext?['hasDyspnea'] == true;
+    // Facteurs de risque épidémiologiques
+    final bool tbContact = patientContext?['tbContact'] == true;
+    final bool isImmunocompromised = patientContext?['isImmunocompromised'] == true ||
+        medicalConditions.any((c) => c.contains('VIH') || c.contains('HIV'));
 
     // 🆕 DÉTECTION TOUX AMÉLIORÉE - BASÉE SUR ACOUSTIQUE (PAS SUR LES MOTS!)
     // ⚠️ Vous N'AVEZ PAS BESOIN de dire "toux" - on analyse le SON directement
@@ -53,19 +69,19 @@ class CoughAnalysisHelper {
         lowerText.contains('respiration') ||
         lowerText.contains('expectoration');
 
-    // 2️⃣ DÉTECTION PRINCIPALE PAR DURÉE: Si audio > 1s, analysable
-    final hasCoughByDuration = duration > 1.0;
+    // 2️⃣ DÉTECTION PAR DURÉE: tout audio > 1.5s est analysable
+    final hasCoughByDuration = duration > 1.5;
 
-    // 3️⃣ DÉTECTION PRINCIPALE PAR ACOUSTIQUE: Énergie élevée ou pics sonores
+    // 3️⃣ DÉTECTION ACOUSTIQUE: seuil bas pour capter toux même faibles
     bool hasCoughByAcoustics = false;
     if (audioFeatures != null) {
       final energy = audioFeatures['energy'] ?? 0.0;
       final peaks = audioFeatures['energyPeaks'] as List? ?? [];
-      hasCoughByAcoustics = energy > 0.3 || peaks.length > 0;
+      // Seuil 0.05 = 5% RMS (couvre toux faibles à distance normale)
+      hasCoughByAcoustics = energy > 0.05 || peaks.isNotEmpty;
     }
 
-    // ✅ TOUX DÉTECTÉE SI: durée OU acoustique (mots-clés optionnels)
-    // 💡 Vous pouvez tousser SANS PARLER!
+    // ✅ TOUX DÉTECTÉE SI durée OU acoustique suffisante (mots-clés optionnels)
     final hasCough =
         hasCoughKeywords || hasCoughByDuration || hasCoughByAcoustics;
 
@@ -177,162 +193,101 @@ class CoughAnalysisHelper {
     // 1. Type de toux (TB souvent sèche au début, puis productive)
     if (coughType == 'productive')
       tbRisk += 25;
-    else if (coughType == 'sèche' && duration > 14)
+    else if (coughType == 'sèche' && symptomDurationDays > 14)
       tbRisk += 30; // Toux sèche chronique
 
-    // 2. Durée (TB = toux chronique >3 semaines = 21 jours)
-    if (duration > 21)
-      tbRisk += 30; // Critère majeur TB
-    else if (duration > 15)
-      tbRisk += 20;
-    else if (duration > 7) tbRisk += 10;
+    // ================================================================
+    // SCORING TB — Basé sur WHO 4-symptom screen (2021) + acoustique
+    // Référence: WHO Consolidated Guidelines on Tuberculosis, Module 2
+    // ================================================================
 
-    // 3. Caractéristiques acoustiques TB
-    if (audioFeatures != null) {
-      // TB: fréquence souvent dans bande 200-400 Hz
-      if (frequency >= 200 && frequency <= 400) tbRisk += 15;
+    // A. WHO 4-symptom screen: toussez + fièvre + sueurs nocturnes + perte de poids
+    // Chaque symptôme présent → investiguer TB
+    int whoTbSymptoms = 0;
+    if (symptomDurationDays > 2) whoTbSymptoms++; // Toux présente
+    if (hasFever) whoTbSymptoms++;
+    if (hasNightSweats) whoTbSymptoms++;
+    if (hasWeightLoss) whoTbSymptoms++;
 
-      // TB: toux "sèche" mais persistante (ZCR élevé)
-      if (zcr > 0.15 && duration > 10) tbRisk += 10;
+    if (whoTbSymptoms >= 3) tbRisk += 40; // 3+ symptômes WHO = très suspect TB
+    else if (whoTbSymptoms == 2) tbRisk += 20;
+    else if (whoTbSymptoms == 1) tbRisk += 5;
 
-      // TB: énergie modérée mais constante
-      if (energy > 0.4 && energy < 0.7) tbRisk += 5;
-    }
+    // B. Durée de la toux (critère principal TB chronique ≥ 2 semaines)
+    if (symptomDurationDays >= 21) tbRisk += 30; // >3 semaines = signe fort
+    else if (symptomDurationDays >= 14) tbRisk += 20; // 2 semaines
+    else if (symptomDurationDays >= 7) tbRisk += 10;
 
-    // 4. Symptômes associés (texte + contexte)
+    // C. Hémoptysie (signe cardinal TB)
     if (lowerText.contains('sang') || lowerText.contains('hémoptysie')) {
-      tbRisk += 40; // Hémoptysie = signe fort TB
-    }
-    if (lowerText.contains('sueur') || lowerText.contains('nocturne')) {
-      tbRisk += 25; // Sueurs nocturnes
-    }
-    if (lowerText.contains('perte') && lowerText.contains('poids')) {
-      tbRisk += 20; // Amaigrissement
-    }
-    if (lowerText.contains('fatigue') || lowerText.contains('faiblesse')) {
-      tbRisk += 15;
+      tbRisk += 35;
     }
 
-    // 5. Contexte patient
-    if (patientContext != null) {
-      // SpO2 bas = signe de compromission respiratoire
-      if (currentSpO2 != null && currentSpO2 < 92) {
-        tbRisk += 25; // TB avancée
-      } else if (currentSpO2 != null && currentSpO2 < 95) {
-        tbRisk += 15;
-      }
+    // D. Vitales ESP32
+    if (currentSpO2 != null && currentSpO2 < 92) tbRisk += 20;
+    else if (currentSpO2 != null && currentSpO2 < 95) tbRisk += 10;
+    // Fièvre modérée 37.5–38.5 typique TB (pas la fièvre élevée de la pneumonie)
+    if (currentTemp != null && currentTemp >= 37.5 && currentTemp < 38.5) tbRisk += 10;
 
-      // Température modérée persistante
-      if (currentTemp != null && currentTemp > 37.5 && currentTemp < 38.5) {
-        tbRisk += 10; // Fièvre modérée typique TB
-      }
+    // E. Facteurs de risque épidémiologiques (questionnaire)
+    if (tbContact) tbRisk += 30; // Contact TB = facteur de risque majeur ISTC Standard 1
+    if (isImmunocompromised) tbRisk += 25; // VIH/immunodépression = risque TB multiplié ×7
+    if (patientAge != null && patientAge >= 15 && patientAge <= 45) tbRisk += 8;
 
-      // Âge: TB plus fréquente 15-45 ans
-      if (patientAge != null && patientAge >= 15 && patientAge <= 45) {
-        tbRisk += 10;
-      }
-
-      // Conditions médicales
-      if (medicalConditions.contains('VIH') ||
-          medicalConditions.contains('HIV')) {
-        tbRisk += 20; // VIH = facteur risque majeur TB
-      }
-    }
-
-    // === CRITÈRES PNEUMONIE ===
-
-    // 1. Type de toux (Pneumonie = toux grasse/productive)
-    if (coughType == 'grasse') {
-      pneumoniaRisk += 40; // Signe fort pneumonie
-    } else if (coughType == 'productive') {
-      pneumoniaRisk += 30;
-    }
-
-    // 2. Caractéristiques acoustiques Pneumonie
+    // F. Acoustique TB (toux sèche persistante, fréquence 200-400 Hz)
     if (audioFeatures != null) {
-      // Pneumonie: fréquences basses dominantes (mucus, liquide)
-      double lowFreqRatio = spectralFeatures['lowBand'] ?? 0.0;
-      if (lowFreqRatio > 0.5) pneumoniaRisk += 25;
-
-      // Pneumonie: ZCR faible (signal humide, gargouillis)
-      if (zcr < 0.1) pneumoniaRisk += 20;
-
-      // Pneumonie: énergie élevée (toux violente)
-      if (energy > 0.7) pneumoniaRisk += 15;
-
-      // Crépitements (si détectés dans features)
-      if (audioFeatures.containsKey('crackles') &&
-          audioFeatures['crackles'] == true) {
-        pneumoniaRisk += 30;
-      }
+      if (frequency >= 200 && frequency <= 400) tbRisk += 10;
+      if (coughType == 'sèche' && symptomDurationDays >= 14) tbRisk += 10;
     }
 
-    // 3. Durée (Pneumonie = aiguë, quelques jours à 2 semaines)
-    if (duration >= 3 && duration <= 14) {
-      pneumoniaRisk += 20; // Fenêtre typique pneumonie
+    // ================================================================
+    // SCORING PNEUMONIE — Basé sur CURB-65 simplifié + BTS Guidelines
+    // Référence: British Thoracic Society 2009, CURB-65 score
+    // ================================================================
+
+    // CURB-65 simplifié avec données disponibles:
+    // C = Confusion (non disponible sans examen clinique)
+    // U = Urée (non disponible sans biologie)
+    // R = Fréquence respiratoire > 30/min (estimée via SpO2 < 92 = tachypnée)
+    // B = Pression artérielle < 90 (non disponible)
+    // 65 = Âge ≥ 65 ans
+
+    int curbScore = 0;
+    if (currentSpO2 != null && currentSpO2 < 92) curbScore++; // Proxy tachypnée
+    if (patientAge != null && patientAge >= 65) curbScore++;
+
+    pneumoniaRisk += curbScore * 20; // Chaque critère CURB = +20 points
+
+    // A. Symptômes déclarés (questionnaire clinique)
+    if (hasFever && hasChestPain) pneumoniaRisk += 25; // Association forte pneumonie
+    if (hasFever) pneumoniaRisk += 15;
+    if (hasChestPain) pneumoniaRisk += 20;
+    if (hasDyspnea) pneumoniaRisk += 15;
+
+    // B. Vitales ESP32 (critères objectifs)
+    if (currentSpO2 != null && currentSpO2 < 90) pneumoniaRisk += 30; // Urgence
+    else if (currentSpO2 != null && currentSpO2 < 94) pneumoniaRisk += 15;
+    if (currentTemp != null && currentTemp >= 38.5) pneumoniaRisk += 25; // Fièvre bactérienne
+    else if (currentTemp != null && currentTemp >= 38.0) pneumoniaRisk += 15;
+    if (currentHR != null && currentHR > 100) pneumoniaRisk += 10; // Tachycardie
+
+    // C. Durée typique pneumonie (aiguë: 3–14 jours)
+    if (symptomDurationDays >= 3 && symptomDurationDays <= 14) pneumoniaRisk += 15;
+
+    // D. Acoustique pneumonie (toux grasse, basses fréquences, crépitements)
+    if (audioFeatures != null) {
+      if (coughType == 'grasse') pneumoniaRisk += 25;
+      else if (coughType == 'productive') pneumoniaRisk += 15;
+      final lowFreqRatio = spectralFeatures['lowBand'] ?? 0.0;
+      if (lowFreqRatio > 0.5) pneumoniaRisk += 15; // Mucus/liquide pulmonaire
+      if (zcr < 0.1) pneumoniaRisk += 10; // Signal humide
+      if (audioFeatures['crackles'] == true) pneumoniaRisk += 20; // Crépitements
     }
 
-    // 4. Symptômes associés
-    if (lowerText.contains('douleur') && lowerText.contains('thoracique')) {
-      pneumoniaRisk += 35; // Douleur thoracique = signe fort
-    }
-    if (lowerText.contains('fièvre') || lowerText.contains('chaud')) {
-      pneumoniaRisk += 25; // Fièvre élevée
-    }
-    if (lowerText.contains('frisson')) {
-      pneumoniaRisk += 20;
-    }
-    if (lowerText.contains('essoufflement') || lowerText.contains('dyspnée')) {
-      pneumoniaRisk += 20;
-    }
-    if (lowerText.contains('glaire') &&
-        (lowerText.contains('vert') || lowerText.contains('jaune'))) {
-      pneumoniaRisk += 25; // Expectoration purulente
-    }
-
-    // 5. Contexte patient
-    if (patientContext != null) {
-      // SpO2 très bas = détresse respiratoire (pneumonie sévère)
-      if (currentSpO2 != null && currentSpO2 < 90) {
-        pneumoniaRisk += 35; // Urgence
-      } else if (currentSpO2 != null && currentSpO2 < 93) {
-        pneumoniaRisk += 25;
-      }
-
-      // Fièvre élevée
-      if (currentTemp != null && currentTemp > 38.5) {
-        pneumoniaRisk += 30; // Fièvre haute = pneumonie bactérienne
-      } else if (currentTemp != null && currentTemp > 37.5) {
-        pneumoniaRisk += 15;
-      }
-
-      // Tachycardie (FC élevée)
-      if (currentHR != null && currentHR > 100) {
-        pneumoniaRisk += 15; // Réponse inflammatoire
-      }
-
-      // Âge: Pneumonie risque élevé <5 ans et >65 ans
-      if (patientAge != null && (patientAge < 5 || patientAge > 65)) {
-        pneumoniaRisk += 15;
-      }
-
-      // Conditions médicales
-      if (medicalConditions.contains('asthme') ||
-          medicalConditions.contains('BPCO')) {
-        pneumoniaRisk += 15;
-      }
-      if (medicalConditions.contains('diabète')) {
-        pneumoniaRisk += 10;
-      }
-    }
-
-    // Ajustement intensité
-    if (intensityScore == 3) {
-      pneumoniaRisk += 15; // Pneumonie souvent toux violente
-      tbRisk += 5;
-    } else if (intensityScore == 2) {
-      pneumoniaRisk += 10;
-    }
+    // E. Comorbidités
+    if (medicalConditions.any((c) => c.contains('asthme') || c.contains('BPCO'))) pneumoniaRisk += 10;
+    if (medicalConditions.any((c) => c.contains('diabète'))) pneumoniaRisk += 8;
+    if (patientAge != null && (patientAge < 5 || patientAge > 65)) pneumoniaRisk += 10;
 
     // Clamp scores 0-100
     tbRisk = tbRisk.clamp(0, 100);

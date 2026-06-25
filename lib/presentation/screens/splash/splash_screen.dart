@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../routes/app_routes.dart';
@@ -46,14 +48,24 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(
       Duration(seconds: AppConstants.splashScreenDuration),
     );
-    
+
     if (!mounted) return;
-    
-    // TODO: Vérifier si l'utilisateur a déjà vu l'onboarding (SharedPreferences)
-    // TODO: Vérifier si l'utilisateur est connecté (Firebase Auth)
-    
-    // Pour l'instant, toujours aller vers l'onboarding
-    Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      Navigator.pushReplacementNamed(context, AppRoutes.home);
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenOnboarding = prefs.getBool('onboarding_complete') ?? false;
+
+    if (!mounted) return;
+
+    Navigator.pushReplacementNamed(
+      context,
+      hasSeenOnboarding ? AppRoutes.welcome : AppRoutes.onboarding,
+    );
   }
 
   @override

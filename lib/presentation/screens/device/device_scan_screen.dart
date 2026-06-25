@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/providers/app_providers.dart';
@@ -17,7 +18,7 @@ class DeviceScanScreen extends ConsumerStatefulWidget {
 
 class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
   bool _isScanning = false;
-  List<BluetoothDevice> _devices = [];
+  List<ScanResult> _scanResults = [];
   String? _errorMessage;
 
   @override
@@ -32,20 +33,32 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
     super.dispose();
   }
 
+  /// 🔐 DEMANDER LES PERMISSIONS BLE + LOCALISATION
+  Future<bool> _requestBlePermissions() async {
+    final permissions = [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.locationWhenInUse,
+    ];
+    final statuses = await permissions.request();
+    return statuses.values.every((s) => s.isGranted);
+  }
+
   /// 🔍 DÉMARRER LE SCAN BLUETOOTH RÉEL
   Future<void> _startScan() async {
     setState(() {
       _isScanning = true;
-      _devices.clear();
+      _scanResults.clear();
       _errorMessage = null;
     });
 
     try {
-      // Vérifier si Bluetooth est disponible
-      final isAvailable = await FlutterBluePlus.isAvailable;
-      if (!isAvailable) {
+      // Demander les permissions BLE au runtime (obligatoire Android 6+)
+      final permissionsGranted = await _requestBlePermissions();
+      if (!permissionsGranted) {
         setState(() {
-          _errorMessage = 'Bluetooth non disponible sur cet appareil';
+          _errorMessage =
+              'Permissions Bluetooth refusées. Activez-les dans les paramètres de l\'application.';
           _isScanning = false;
         });
         return;
@@ -63,18 +76,16 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
 
       // Utiliser le service RespiraBox pour scanner TOUS les appareils
       final deviceService = ref.read(respiraBoxServiceProvider);
-      final foundDevices = await deviceService.scanForDevices(
+      final foundResults = await deviceService.scanForDevices(
         timeout: const Duration(seconds: 15),
       );
 
       if (!mounted) return;
 
-      print('🔍 ${foundDevices.length} appareils trouvés au total');
-
       setState(() {
-        _devices = foundDevices; // Afficher TOUS les appareils trouvés
+        _scanResults = foundResults;
         _isScanning = false;
-        if (foundDevices.isEmpty) {
+        if (foundResults.isEmpty) {
           _errorMessage =
               'Aucun appareil Bluetooth détecté. Vérifiez que le boîtier est allumé.';
         }
@@ -89,7 +100,8 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
   }
 
   /// 🔗 CONNECTER AU DEVICE SÉLECTIONNÉ
-  Future<void> _connectToDevice(BluetoothDevice device) async {
+  Future<void> _connectToDevice(ScanResult result) async {
+    final device = result.device;
     // Afficher le dialog de connexion
     showDialog(
       context: context,
@@ -215,7 +227,7 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
                           style: AppTextStyles.headline3,
                         ),
                         const Spacer(),
-                        if (_devices.isNotEmpty)
+                        if (_scanResults.isNotEmpty)
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
@@ -224,7 +236,7 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              '${_devices.length} trouvé${_devices.length > 1 ? 's' : ''}',
+                              '${_scanResults.length} trouvé${_scanResults.length > 1 ? 's' : ''}',
                               style: TextStyle(
                                 color: AppColors.success,
                                 fontWeight: FontWeight.bold,
@@ -244,10 +256,10 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
             ),
             // Bouton relancer la recherche
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: SizedBox(
                 width: double.infinity,
-                height: 56,
+                height: 52,
                 child: OutlinedButton.icon(
                   onPressed: _isScanning ? null : _startScan,
                   icon:
@@ -261,6 +273,25 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                  ),
+                ),
+              ),
+            ),
+            // Bouton Mode Démonstration (sans BLE)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: TextButton.icon(
+                  onPressed: () {
+                    ref.read(isDemoModeProvider.notifier).state = true;
+                    Navigator.pushNamed(context, AppRoutes.testPreparation);
+                  },
+                  icon: const Icon(Icons.science_outlined, size: 18),
+                  label: const Text('Mode démonstration (sans boîtier)'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.textLight,
                   ),
                 ),
               ),
@@ -335,7 +366,7 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
       );
     }
 
-    if (_devices.isEmpty && !_isScanning) {
+    if (_scanResults.isEmpty && !_isScanning) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -366,12 +397,12 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
     }
 
     return ListView.builder(
-      itemCount: _devices.length,
+      itemCount: _scanResults.length,
       itemBuilder: (context, index) {
-        final device = _devices[index];
+        final result = _scanResults[index];
         return _DeviceCard(
-          device: device,
-          onConnect: () => _connectToDevice(device),
+          result: result,
+          onConnect: () => _connectToDevice(result),
         );
       },
     );
@@ -422,16 +453,19 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
 
 /// 📦 CARTE D'UN DEVICE BLUETOOTH DÉTECTÉ
 class _DeviceCard extends StatelessWidget {
-  final BluetoothDevice device;
+  final ScanResult result;
   final VoidCallback onConnect;
 
   const _DeviceCard({
-    required this.device,
+    required this.result,
     required this.onConnect,
   });
 
   @override
   Widget build(BuildContext context) {
+    final device = result.device;
+    final rssi = result.rssi;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -449,19 +483,25 @@ class _DeviceCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Icône Bluetooth
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: const Icon(
-              Icons.bluetooth_connected,
-              color: AppColors.primary,
-              size: 28,
-            ),
+          // Icône Bluetooth + indicateur RSSI
+          Column(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: const Icon(
+                  Icons.bluetooth_connected,
+                  color: AppColors.primary,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 4),
+              _RssiIndicator(rssi: rssi),
+            ],
           ),
           const SizedBox(width: 16),
           // Informations
@@ -482,6 +522,14 @@ class _DeviceCard extends StatelessWidget {
                     color: AppColors.textLight,
                   ),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  '${rssi} dBm',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: _rssiColor(rssi),
+                    fontSize: 11,
+                  ),
+                ),
               ],
             ),
           ),
@@ -500,6 +548,53 @@ class _DeviceCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Color _rssiColor(int rssi) {
+    if (rssi >= -60) return AppColors.success;
+    if (rssi >= -75) return Colors.orange;
+    return AppColors.error;
+  }
+}
+
+/// 📶 INDICATEUR DE SIGNAL RSSI (4 barres)
+class _RssiIndicator extends StatelessWidget {
+  final int rssi;
+
+  const _RssiIndicator({required this.rssi});
+
+  int get _bars {
+    if (rssi >= -55) return 4;
+    if (rssi >= -67) return 3;
+    if (rssi >= -80) return 2;
+    return 1;
+  }
+
+  Color get _color {
+    if (rssi >= -60) return AppColors.success;
+    if (rssi >= -75) return Colors.orange;
+    return AppColors.error;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(4, (i) {
+        final active = i < _bars;
+        final barHeight = 4.0 + i * 3.0;
+        return Container(
+          width: 4,
+          height: barHeight,
+          margin: const EdgeInsets.only(right: 1),
+          decoration: BoxDecoration(
+            color: active ? _color : Colors.grey.shade300,
+            borderRadius: BorderRadius.circular(1),
+          ),
+        );
+      }),
     );
   }
 }

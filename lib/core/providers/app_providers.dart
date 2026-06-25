@@ -136,6 +136,12 @@ final deviceDataStreamProvider = StreamProvider<Map<String, dynamic>>((ref) {
   return deviceService.dataStream;
 });
 
+/// Stream des statuts Arduino : STATUS:FINGER_ON / FINGER_OFF / READY, ERROR:...
+final deviceStatusStreamProvider = StreamProvider<String>((ref) {
+  final deviceService = ref.watch(respiraBoxServiceProvider);
+  return deviceService.statusStream;
+});
+
 // ============================================================================
 // 🎯 UI STATE PROVIDERS
 // ============================================================================
@@ -154,3 +160,6 @@ final darkModeProvider = StateProvider<bool>((ref) => false);
 
 /// Langue sélectionnée
 final languageProvider = StateProvider<String>((ref) => 'fr');
+
+/// Mode démonstration (sans BLE physique)
+final isDemoModeProvider = StateProvider<bool>((ref) => false);

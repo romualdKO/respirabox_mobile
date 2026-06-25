@@ -5,11 +5,13 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'cough_analysis_extension.dart';
 import 'audio_features_extractor.dart';
+import 'gemini_ai_service.dart';
+import '../../core/constants/app_constants.dart';
 
-/// 🎤 SERVICE ASSEMBLYAI
+/// SERVICE ASSEMBLYAI
 /// Transcription vocale et analyse audio (toux, respiration)
 class AssemblyAIService {
-  static const String _apiKey = 'a4daf92b53b84a198633a77a2c4b8616';
+  static String get _apiKey => AppConstants.assemblyAiApiKey;
   static const String _uploadUrl = 'https://api.assemblyai.com/v2/upload';
   static const String _transcriptUrl =
       'https://api.assemblyai.com/v2/transcript';
@@ -109,32 +111,28 @@ class AssemblyAIService {
     }
   }
 
-  /// ⏳ Attendre que la transcription soit terminée
+  /// ⏳ Attendre que la transcription soit terminée (max 60s)
   Future<String> _waitForTranscription(
       String transcriptId, bool analyzeCough) async {
-    while (true) {
+    const maxRetries = 30; // 30 × 2s = 60s maximum
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
       await Future.delayed(const Duration(seconds: 2));
 
-      final response = await http.get(
-        Uri.parse('$_transcriptUrl/$transcriptId'),
-        headers: {
-          'authorization': _apiKey,
-        },
-      );
+      try {
+        final response = await http.get(
+          Uri.parse('$_transcriptUrl/$transcriptId'),
+          headers: {'authorization': _apiKey},
+        ).timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final status = data['status'];
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final status = data['status'];
 
-        print('📊 Statut transcription: $status');
+          if (status == 'completed') {
+            final text = data['text'] as String? ?? '';
 
-        if (status == 'completed') {
-          final text = data['text'] ?? '';
-
-          // Si analyse audio activée
-          if (analyzeCough && data['audio_events'] != null) {
-            final events = data['audio_events'] as List;
-            if (events.isNotEmpty) {
+            if (analyzeCough && data['audio_events'] != null) {
+              final events = data['audio_events'] as List;
               final coughEvents = events
                   .where((e) =>
                       e['label'].toString().toLowerCase().contains('cough') ||
@@ -147,17 +145,20 @@ class AssemblyAIService {
                     'Transcription: $text';
               }
             }
-          }
 
-          return text;
-        } else if (status == 'error') {
-          throw Exception('Erreur transcription: ${data['error']}');
+            return text;
+          } else if (status == 'error') {
+            throw Exception('Erreur transcription: ${data['error']}');
+          }
+        } else {
+          throw Exception('Erreur vérification: ${response.statusCode}');
         }
-        // Continuer à attendre si status == 'queued' ou 'processing'
-      } else {
-        throw Exception('Erreur vérification: ${response.statusCode}');
+      } catch (e) {
+        if (attempt >= maxRetries - 1) rethrow;
+        print('⚠️ Polling tentative $attempt: $e');
       }
     }
+    throw Exception('Transcription timeout après ${maxRetries * 2}s');
   }
 
   /// 🎤 Transcrire depuis un fichier local
@@ -186,136 +187,153 @@ class AssemblyAIService {
     String audioFilePath, {
     Map<String, dynamic>? patientContext,
   }) async {
+    // ÉTAPE 1a : Gemini ML audio (si clé valide) — vrai modèle ML multimodal
+    print('🤖 Tentative analyse ML Gemini Audio...');
+    final geminiML = await GeminiAIService().analyzeAudio(
+      audioFilePath,
+      patientContext: patientContext,
+    );
+    final hasGeminiML = geminiML.isNotEmpty;
+    if (hasGeminiML) {
+      print('✅ Gemini ML disponible — scores ML utilisés en priorité');
+    }
+
+    // ÉTAPE 1b : Extraction acoustique locale (WAV → PCM) — fallback FFT
+    print('🎵 Extraction features audio FFT locales...');
+    final audioFeatures =
+        await AudioFeaturesExtractor.extractFeatures(audioFilePath);
+    final localDuration = (audioFeatures['duration'] as double?) ?? 0.0;
+    print(
+        '✅ FFT: durée=${localDuration.toStringAsFixed(1)}s  énergie=${(audioFeatures['energy'] * 100).toStringAsFixed(0)}%  pics=${(audioFeatures['energyPeaks'] as List).length}');
+
+    // ÉTAPE 2 : Transcription AssemblyAI (optionnelle — enrichit le texte)
+    String transcribedText = '';
+    double confidence = 0.8;
+    double assemblyDuration = localDuration;
+
     try {
-      print('🩺 Analyse avancée de la toux avec features acoustiques...');
-
-      // 🎵 ÉTAPE 1: EXTRACTION FEATURES ACOUSTIQUES (NOUVEAU)
-      print('🎵 Extraction features audio (FFT, MFCC, spectral)...');
-      final audioFeatures =
-          await AudioFeaturesExtractor.extractFeatures(audioFilePath);
-
-      print('✅ Features extraites:');
-      print('   - Fréquence: ${audioFeatures['frequency']} Hz');
-      print(
-          '   - Énergie: ${(audioFeatures['energy'] * 100).toStringAsFixed(1)}%');
-      print('   - ZCR: ${audioFeatures['zeroCrossingRate']}');
-      print('   - Crépitements: ${audioFeatures['crackles']}');
-
-      // 🎤 ÉTAPE 2: TRANSCRIPTION ASSEMBLYAI
       final audioUrl = await uploadAudio(audioFilePath);
-
-      // Configuration avancée pour analyse audio
-      final response = await http.post(
-        Uri.parse(_transcriptUrl),
-        headers: {
-          'authorization': _apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'audio_url': audioUrl,
-          'language_code': 'fr',
-          'speech_model': 'nano',
-          'punctuate': false,
-          'format_text': false,
-          // Activer l'analyse audio avancée
-          'audio_start_from': 0,
-          'audio_end_at': null,
-          'word_boost': ['toux', 'respiration', 'crachat'],
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse(_transcriptUrl),
+            headers: {
+              'authorization': _apiKey,
+              'Content-Type': 'application/json',
+            },
+            body: json.encode({
+              'audio_url': audioUrl,
+              'language_code': 'fr',
+              'speech_model': 'nano',
+              'punctuate': false,
+              'format_text': false,
+              'word_boost': ['toux', 'respiration', 'crachat'],
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final transcriptId = data['id'];
+        final transcriptId = json.decode(response.body)['id'];
+        print('⏳ Transcription AssemblyAI (ID: $transcriptId)...');
 
-        // Attendre le résultat avec analyse avancée
-        print('⏳ Analyse en cours (ID: $transcriptId)...');
-        while (true) {
+        for (int i = 0; i < 30; i++) {
           await Future.delayed(const Duration(seconds: 2));
-
-          final result = await http.get(
+          final poll = await http.get(
             Uri.parse('$_transcriptUrl/$transcriptId'),
             headers: {'authorization': _apiKey},
           );
-
-          if (result.statusCode == 200) {
-            final resultData = json.decode(result.body);
-
-            if (resultData['status'] == 'completed') {
-              print('✅ Analyse terminée');
-              print('📊 Text transcrit: "${resultData['text']}"');
-              print('📊 Confiance: ${resultData['confidence']}');
-              print('📊 Durée: ${resultData['audio_duration']}s');
-
-              final text = resultData['text'] ?? '';
-              final confidence = resultData['confidence'] ?? 0.0;
-              final duration = resultData['audio_duration'] ?? 0.0;
-
-              // 🧠 ÉTAPE 3: ANALYSE INTELLIGENTE AVEC FEATURES ACOUSTIQUES + CONTEXTE
-              // ⚠️ NE DÉPEND PLUS DU TEXTE TRANSCRIT!
-              // La détection repose sur: durée, énergie, pics sonores
-              print(
-                  '🎯 Analyse acoustique (transcription ignorée pour détection):');
-              print('   - Texte AssemblyAI: "$text"');
-              print('   - Durée audio: ${duration}s');
-              print('   - Énergie: ${audioFeatures['energy']}');
-
-              final coughAnalysis = CoughAnalysisHelper.analyzeCoughPattern(
-                  text.isEmpty ? 'son non-verbal' : text, duration, confidence,
-                  audioFeatures: audioFeatures, patientContext: patientContext);
-
-              print('✅ Résultat analyse:');
-              print('   - Toux détectée: ${coughAnalysis['hasCough']}');
-              print('   - Type toux: ${coughAnalysis['type']}');
-              print('   - Risque TB: ${coughAnalysis['tbRisk']}%');
-              print(
-                  '   - Risque Pneumonie: ${coughAnalysis['pneumoniaRisk']}%');
-              print('   - Niveau urgence: ${coughAnalysis['urgencyLevel']}');
-
-              return {
-                'status': 'completed',
-                'hasCough':
-                    coughAnalysis['hasCough'], // Basé UNIQUEMENT sur acoustique
-                'text': text.isEmpty
-                    ? '[Son non-verbal - analyse acoustique effectuée]'
-                    : text,
-                'confidence': confidence,
-                'duration': duration,
-                // Résultats d'analyse médicale
-                'coughType': coughAnalysis['type'], // sèche, productive, grasse
-                'intensity':
-                    coughAnalysis['intensity'], // légère, modérée, sévère
-                'frequency':
-                    coughAnalysis['frequency'], // nombre estimé de toux
-                'tuberculosisRisk': coughAnalysis['tbRisk'], // 0-100
-                'pneumoniaRisk': coughAnalysis['pneumoniaRisk'], // 0-100
-                'recommendation': coughAnalysis['recommendation'],
-                'medicalScore': coughAnalysis['medicalScore'],
-                // 🆕 NOUVELLES DONNÉES
-                'urgencyLevel': coughAnalysis['urgencyLevel'],
-                'actions': coughAnalysis['actions'],
-                'diseaseComparison': coughAnalysis['diseaseComparison'],
-                'acousticFeatures': coughAnalysis['acousticFeatures'],
-                'wetnessProbability': coughAnalysis['wetnessProbability'],
-              };
-            } else if (resultData['status'] == 'error') {
-              throw Exception('Erreur analyse: ${resultData['error']}');
+          if (poll.statusCode == 200) {
+            final d = json.decode(poll.body);
+            if (d['status'] == 'completed') {
+              transcribedText = d['text'] ?? '';
+              confidence = (d['confidence'] as num?)?.toDouble() ?? 0.8;
+              assemblyDuration =
+                  (d['audio_duration'] as num?)?.toDouble() ?? localDuration;
+              print('✅ AssemblyAI: "$transcribedText" (${assemblyDuration}s)');
+              break;
+            } else if (d['status'] == 'error') {
+              break;
             }
           }
         }
-      } else {
-        throw Exception(
-            'Erreur requête: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      print('❌ Erreur analyse toux: $e');
-      return {
-        'hasCough': false,
-        'coughCount': 0,
-        'duration': 0,
-        'text': '',
-        'error': e.toString(),
-      };
+      // AssemblyAI facultatif — on continue avec l'analyse acoustique seule
+      print('⚠️ AssemblyAI indisponible: $e → analyse acoustique seule');
     }
+
+    // Meilleure durée disponible (AssemblyAI > locale)
+    final bestDuration = assemblyDuration > 0 ? assemblyDuration : localDuration;
+
+    // Durée symptômes déclarée par le patient (questionnaire)
+    final symptomDurationDays =
+        (patientContext?['symptomDurationDays'] as int?) ?? 0;
+
+    // ÉTAPE 3 : Analyse clinique règles (WHO TB + PSI Pneumonie)
+    final coughAnalysis = CoughAnalysisHelper.analyzeCoughPattern(
+      transcribedText.isEmpty ? 'son non-verbal' : transcribedText,
+      bestDuration,
+      confidence,
+      audioFeatures: audioFeatures,
+      patientContext: patientContext,
+      symptomDurationDays: symptomDurationDays,
+    );
+
+    // ÉTAPE 4 : Fusion ML Gemini + scoring clinique
+    // Si Gemini ML disponible : moyenne pondérée (60% ML, 40% clinique)
+    // Si Gemini indisponible : scoring clinique seul
+    int finalTbRisk;
+    int finalPneumoniaRisk;
+    bool finalHasCough;
+    String finalCoughType;
+    String finalIntensity;
+    double mlConfidence = 0.0;
+
+    if (hasGeminiML) {
+      final mlTb = (geminiML['tbScore'] as num?)?.toInt() ?? 0;
+      final mlPneumonia = (geminiML['pneumoniaScore'] as num?)?.toInt() ?? 0;
+      final mlHasCough = geminiML['hasCough'] as bool? ?? true;
+      mlConfidence = (geminiML['mlConfidence'] as num?)?.toDouble() ?? 0.8;
+
+      // Pondération : ML Gemini 60% + clinique 40%
+      finalTbRisk = ((mlTb * 0.6) + (coughAnalysis['tbRisk'] * 0.4)).round().clamp(0, 100);
+      finalPneumoniaRisk = ((mlPneumonia * 0.6) + (coughAnalysis['pneumoniaRisk'] * 0.4)).round().clamp(0, 100);
+      // hasCough : OR entre ML et acoustique (si l'un des deux le détecte → vrai)
+      finalHasCough = mlHasCough || (coughAnalysis['hasCough'] as bool? ?? false);
+      finalCoughType = geminiML['coughType'] as String? ?? coughAnalysis['type'] as String;
+      finalIntensity = geminiML['intensity'] as String? ?? coughAnalysis['intensity'] as String;
+
+      print('🩺 FUSION ML+Clinique: hasCough=$finalHasCough  TB=$finalTbRisk%  Pneumonie=$finalPneumoniaRisk%  (ML confiance=${(mlConfidence*100).toInt()}%)');
+    } else {
+      finalTbRisk = coughAnalysis['tbRisk'] as int;
+      finalPneumoniaRisk = coughAnalysis['pneumoniaRisk'] as int;
+      finalHasCough = coughAnalysis['hasCough'] as bool? ?? false;
+      finalCoughType = coughAnalysis['type'] as String;
+      finalIntensity = coughAnalysis['intensity'] as String;
+      print('🩺 Scoring clinique seul: hasCough=$finalHasCough  TB=$finalTbRisk%  Pneumonie=$finalPneumoniaRisk%');
+    }
+
+    return {
+      'status': 'completed',
+      'hasCough': finalHasCough,
+      'text': transcribedText.isEmpty ? '[Analyse acoustique]' : transcribedText,
+      'confidence': confidence,
+      'duration': bestDuration,
+      'type': finalCoughType,
+      'intensity': finalIntensity,
+      'frequency': coughAnalysis['frequency'],
+      'tbRisk': finalTbRisk,
+      'pneumoniaRisk': finalPneumoniaRisk,
+      'recommendation': coughAnalysis['recommendation'],
+      'medicalScore': coughAnalysis['medicalScore'],
+      'urgencyLevel': coughAnalysis['urgencyLevel'],
+      'actions': coughAnalysis['actions'],
+      'diseaseComparison': coughAnalysis['diseaseComparison'],
+      'acousticFeatures': coughAnalysis['acousticFeatures'],
+      'wetnessProbability': coughAnalysis['wetnessProbability'],
+      // Méta-données sur la source d'analyse
+      'analysisSource': hasGeminiML ? 'gemini-ml+clinical' : 'clinical-only',
+      'mlConfidence': mlConfidence,
+      'mlNotes': hasGeminiML ? (geminiML['acousticNotes'] ?? '') : '',
+    };
   }
 }

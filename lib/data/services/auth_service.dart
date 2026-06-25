@@ -10,6 +10,8 @@ class AuthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    // Web client ID (type 3) — fonctionne en debug et release sans contrainte SHA-1
+    serverClientId: '674993570782-666tn1e6lbbdppsolls50u6n6l8qhm0l.apps.googleusercontent.com',
   );
 
   /// Utilisateur actuel connecté
@@ -18,7 +20,30 @@ class AuthService {
   /// Stream de l'état d'authentification
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  /// 📧 INSCRIPTION PAR EMAIL/MOT DE PASSE
+  // ── VALIDATION ───────────────────────────────────────────────
+
+  static final RegExp _emailRegex =
+      RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
+
+  String? _validateEmail(String email) {
+    if (email.trim().isEmpty) return 'L\'email est requis.';
+    if (!_emailRegex.hasMatch(email.trim())) return 'Format d\'email invalide.';
+    return null;
+  }
+
+  String? _validatePassword(String password) {
+    if (password.isEmpty) return 'Le mot de passe est requis.';
+    if (password.length < 8) return 'Le mot de passe doit contenir au moins 8 caractères.';
+    if (!password.contains(RegExp(r'[A-Z]')))
+      return 'Le mot de passe doit contenir au moins une majuscule.';
+    if (!password.contains(RegExp(r'[0-9]')))
+      return 'Le mot de passe doit contenir au moins un chiffre.';
+    return null;
+  }
+
+  // ─────────────────────────────────────────────────────────────
+
+  /// INSCRIPTION PAR EMAIL/MOT DE PASSE
   Future<UserModel?> signUpWithEmailAndPassword({
     required String email,
     required String password,
@@ -28,11 +53,18 @@ class AuthService {
     required DateTime? dateOfBirth,
     required String gender,
   }) async {
+    // Validation côté client avant d'appeler Firebase
+    final emailError    = _validateEmail(email);
+    final passwordError = _validatePassword(password);
+    if (emailError    != null) throw emailError;
+    if (passwordError != null) throw passwordError;
+    if (firstName.trim().isEmpty) throw 'Le prénom est requis.';
+    if (lastName.trim().isEmpty)  throw 'Le nom est requis.';
+
     try {
-      // 1. Créer le compte Firebase Auth sans paramètres optionnels
       final UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(
-        email: email,
+        email: email.trim(),
         password: password,
       );
 
@@ -68,16 +100,19 @@ class AuthService {
     }
   }
 
-  /// 🔑 CONNEXION PAR EMAIL/MOT DE PASSE
+  /// CONNEXION PAR EMAIL/MOT DE PASSE
   Future<UserModel?> signInWithEmailAndPassword({
     required String email,
     required String password,
   }) async {
+    final emailError = _validateEmail(email);
+    if (emailError != null) throw emailError;
+    if (password.isEmpty) throw 'Le mot de passe est requis.';
+
     try {
-      // 1. Se connecter avec Firebase Auth sans paramètres optionnels
       final UserCredential userCredential =
           await _auth.signInWithEmailAndPassword(
-        email: email,
+        email: email.trim(),
         password: password,
       );
 
@@ -115,6 +150,10 @@ class AuthService {
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
+    } catch (_) {
+      // Pas connecté via Google — on ignore
+    }
+    try {
       await _auth.signOut();
     } catch (e) {
       throw 'Erreur lors de la déconnexion: $e';

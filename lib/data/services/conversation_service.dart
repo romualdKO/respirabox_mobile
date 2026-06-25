@@ -68,18 +68,19 @@ class ConversationService {
     }
   }
 
-  /// Récupérer toutes les conversations d'un utilisateur
+  /// Récupérer toutes les conversations d'un utilisateur (tri client-side)
   Future<List<ConversationModel>> getUserConversations(String userId) async {
     try {
       final snapshot = await _firestore
           .collection('conversations')
           .where('userId', isEqualTo: userId)
-          .orderBy('updatedAt', descending: true)
           .get();
 
-      return snapshot.docs
+      final list = snapshot.docs
           .map((doc) => ConversationModel.fromFirestore(doc))
           .toList();
+      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return list;
     } catch (e) {
       print('❌ Erreur récupération conversations: $e');
       return [];
@@ -105,28 +106,28 @@ class ConversationService {
   }
 
   /// Récupérer la dernière conversation active
+  /// Tri côté client pour éviter l'index composite Firestore
   Future<ConversationModel?> getActiveConversation(String userId) async {
     try {
-      // Récupérer toutes les conversations de l'utilisateur et filtrer en local
       final snapshot = await _firestore
           .collection('conversations')
           .where('userId', isEqualTo: userId)
-          .orderBy('updatedAt', descending: true)
-          .limit(10)
+          .where('isActive', isEqualTo: true)
           .get();
 
-      // Filtrer les conversations actives côté client
-      final activeConversations = snapshot.docs
-          .map((doc) => ConversationModel.fromFirestore(doc))
-          .where((conv) => conv.isActive)
-          .toList();
+      if (snapshot.docs.isEmpty) return null;
 
-      if (activeConversations.isNotEmpty) {
-        return activeConversations.first;
-      }
-      return null;
+      // Trier par updatedAt côté client (évite l'index composite)
+      final docs = snapshot.docs
+        ..sort((a, b) {
+          final aDate = a.data()['updatedAt'] as String? ?? '';
+          final bDate = b.data()['updatedAt'] as String? ?? '';
+          return bDate.compareTo(aDate);
+        });
+
+      return ConversationModel.fromFirestore(docs.first);
     } catch (e) {
-      print('❌ Erreur récupération conversation active: $e');
+      print('Erreur récupération conversation active: $e');
       return null;
     }
   }
@@ -194,16 +195,19 @@ class ConversationService {
     }
   }
 
-  /// Stream des conversations en temps réel
+  /// Stream des conversations en temps réel (tri client-side, pas d'index composite)
   Stream<List<ConversationModel>> watchUserConversations(String userId) {
     return _firestore
         .collection('conversations')
         .where('userId', isEqualTo: userId)
-        .orderBy('updatedAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ConversationModel.fromFirestore(doc))
-            .toList());
+        .map((snapshot) {
+      final list = snapshot.docs
+          .map((doc) => ConversationModel.fromFirestore(doc))
+          .toList();
+      list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return list;
+    });
   }
 
   /// Stream d'une conversation spécifique

@@ -100,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Titre
                 Center(
                   child: Text(
-                    'RespiCheck CI',
+                    'RespiraBox',
                     style: AppTextStyles.headline2.copyWith(
                       color: AppColors.textPrimary,
                     ),

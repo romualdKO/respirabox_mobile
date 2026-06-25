@@ -21,45 +21,46 @@ class RespiraBoxDeviceService {
   final StreamController<Map<String, dynamic>> _dataStreamController =
       StreamController<Map<String, dynamic>>.broadcast();
 
+  // Stream des statuts envoyés par l'Arduino (STATUS:FINGER_ON, STATUS:READY, etc.)
+  final StreamController<String> _statusStreamController =
+      StreamController<String>.broadcast();
+
   /// Stream des données en temps réel du device
   Stream<Map<String, dynamic>> get dataStream => _dataStreamController.stream;
+
+  /// Stream des événements de statut Arduino
+  Stream<String> get statusStream => _statusStreamController.stream;
 
   /// État de connexion
   bool get isConnected => _connectedDevice != null;
 
   /// 🔍 SCANNER LES DEVICES BLUETOOTH (UNIQUEMENT RESPIRABOX)
-  Future<List<BluetoothDevice>> scanForDevices(
+  Future<List<ScanResult>> scanForDevices(
       {Duration timeout = const Duration(seconds: 15)}) async {
-    List<BluetoothDevice> foundDevices = [];
+    List<ScanResult> foundResults = [];
 
     try {
-      // Vérifier si Bluetooth est activé
-      final isAvailable = await FlutterBluePlus.isAvailable;
-      if (!isAvailable) {
-        throw 'Bluetooth non disponible sur cet appareil';
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      if (adapterState != BluetoothAdapterState.on) {
+        throw 'Bluetooth non disponible ou éteint';
       }
 
-      // Scanner les devices Bluetooth
       await FlutterBluePlus.startScan(timeout: timeout);
 
-      // Écouter les résultats du scan
-      await Future.delayed(timeout);
-
-      // Récupérer et FILTRER les résultats (uniquement RespiraBox)
       final results = FlutterBluePlus.lastScanResults;
+      final seen = <String>{};
       for (final result in results) {
         final deviceName = result.device.platformName;
-        // Filtrer uniquement les appareils RespiraBox
-        if (deviceName.contains('RespiraBox') ||
-            deviceName.contains('respirabox')) {
-          if (!foundDevices.contains(result.device)) {
-            foundDevices.add(result.device);
-          }
+        final id = result.device.remoteId.toString();
+        if ((deviceName.contains('RespiraBox') ||
+                deviceName.contains('respirabox')) &&
+            seen.add(id)) {
+          foundResults.add(result);
         }
       }
 
       await FlutterBluePlus.stopScan();
-      return foundDevices;
+      return foundResults;
     } catch (e) {
       await FlutterBluePlus.stopScan();
       throw 'Erreur lors du scan: $e';
@@ -100,7 +101,7 @@ class RespiraBoxDeviceService {
 
             // S'abonner aux notifications
             await characteristic.setNotifyValue(true);
-            _dataSubscription = characteristic.lastValueStream.listen((value) {
+            _dataSubscription = characteristic.onValueReceived.listen((value) {
               _handleReceivedData(value);
             });
             print('✅ Notifications activées');
@@ -129,41 +130,36 @@ class RespiraBoxDeviceService {
   /// 📊 TRAITER LES DONNÉES REÇUES DU DEVICE
   void _handleReceivedData(List<int> data) async {
     try {
-      // Convertir les bytes en String
-      final dataString = String.fromCharCodes(data);
+      final dataString = String.fromCharCodes(data).trim();
 
-      // Parser les données ESP32: "HR:75,SPO2:98"
+      // Messages de statut Arduino → stream dédié (pas de données numériques)
+      if (dataString.startsWith('STATUS:') || dataString.startsWith('ERROR:')) {
+        print('📡 Arduino status: $dataString');
+        _statusStreamController.add(dataString);
+        return;
+      }
+
+      // Format données : "HR:75,SPO2:98,TEMP:36.7"
       final Map<String, dynamic> parsedData = {};
-
       final parts = dataString.split(',');
       for (var part in parts) {
         final keyValue = part.split(':');
         if (keyValue.length == 2) {
           final key = keyValue[0].trim();
           final value = double.tryParse(keyValue[1].trim());
-          if (value != null) {
-            parsedData[key] = value;
-          }
+          if (value != null) parsedData[key] = value;
         }
       }
 
-      // 🌡️ Température ambiante réaliste pour Côte d'Ivoire (25-32°C)
-      final baseTemp = 27.0;
-      final hourVariation =
-          (DateTime.now().hour / 24.0) * 5.0; // +5°C en journée
-      final randomOffset = (DateTime.now().second % 10) / 10.0;
-      final temperature = baseTemp + hourVariation + randomOffset;
-      parsedData['TEMP'] = double.parse(temperature.toStringAsFixed(1));
+      if (parsedData.isEmpty) return;
 
-      print(
-          '📊 Données ESP32: HR=${parsedData['HR']}, SpO2=${parsedData['SPO2']}, Temp=${parsedData['TEMP']}°C');
-      print(
-          '💾 → Ces données seront sauvegardées dans Firebase via saveTestResult()');
+      if (!parsedData.containsKey('TEMP')) parsedData['TEMP'] = 0.0;
 
-      // Émettre les données dans le stream
+      print('📊 ESP32 → HR=${parsedData['HR']}, SpO2=${parsedData['SPO2']}, T=${parsedData['TEMP']}°C');
+
       _dataStreamController.add(parsedData);
     } catch (e) {
-      print('❌ Erreur de parsing des données: $e');
+      print('❌ Erreur parsing BLE: $e');
     }
   }
 
@@ -385,6 +381,7 @@ class RespiraBoxDeviceService {
   /// 🧹 NETTOYER LES RESSOURCES
   void dispose() {
     _dataStreamController.close();
+    _statusStreamController.close();
     disconnect();
   }
 }

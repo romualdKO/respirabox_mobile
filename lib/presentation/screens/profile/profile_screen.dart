@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'dart:io';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/providers/app_providers.dart';
@@ -443,7 +441,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             );
                           },
                           errorBuilder: (context, error, stackTrace) {
-                            print('❌ Erreur chargement photo: $error');
                             return const Icon(Icons.person,
                                 size: 50, color: AppColors.primary);
                           },
@@ -901,8 +898,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         // Récupérer l'URL publique
         final downloadUrl = await storageRef.getDownloadURL();
-        print('✅ Photo uploadée: $downloadUrl');
-
         // Mettre à jour avec l'URL Firebase
         setState(() {
           _currentUser = _currentUser?.copyWith(
@@ -912,7 +907,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         // Sauvegarder directement dans Firestore avec l'URL
         await _authService.updateUserProfile(_currentUser!);
-        print('✅ Photo persistée dans Firestore: $downloadUrl');
 
         if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
@@ -925,7 +919,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         }
       }
     } catch (e) {
-      print('❌ Erreur upload photo: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(

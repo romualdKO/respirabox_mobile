@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
+import '../../../data/models/test_result_model.dart';
 import '../../../data/services/patient_context_service.dart';
 import '../../../data/services/cough_analysis_extension.dart';
+import '../../../data/services/pdf_export_service.dart';
 import '../../widgets/disease_risk_comparison_chart.dart';
 
 /// 📊 ÉCRAN DES RÉSULTATS DU TEST
@@ -18,9 +21,12 @@ class TestResultsScreen extends StatelessWidget {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ??
             {};
-    final spo2 = args['spo2'] ?? 96;
-    final heartRate = args['heartRate'] ?? 75;
-    final temperature = args['temperature'] ?? 36.8;
+    final dynamic spo2Raw = args['spo2'] ?? 96;
+    final dynamic heartRateRaw = args['heartRate'] ?? 75;
+    final dynamic temperatureRaw = args['temperature'] ?? 36.8;
+    final int spo2 = spo2Raw is double ? spo2Raw.toInt() : (spo2Raw as int);
+    final int heartRate = heartRateRaw is double ? heartRateRaw.toInt() : (heartRateRaw as int);
+    final double temperature = temperatureRaw is int ? temperatureRaw.toDouble() : (temperatureRaw as double);
     final riskLevel = args['riskLevel'] ?? 'Faible';
     final riskScore = args['riskScore'] ?? 85;
 
@@ -45,6 +51,11 @@ class TestResultsScreen extends StatelessWidget {
         ),
         title: Text('Résultats du test', style: AppTextStyles.h3),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined, color: AppColors.textDark),
+            tooltip: 'Exporter PDF',
+            onPressed: () => _exportPdf(context, spo2, heartRate, temperature, riskLevel, riskScore),
+          ),
           IconButton(
             icon: const Icon(Icons.share, color: AppColors.textDark),
             onPressed: () => _shareResults(
@@ -1043,6 +1054,60 @@ Dépistage des maladies respiratoires
       message,
       subject: 'Résultats de mon test RespiraBox',
     );
+  }
+
+  static Future<void> _exportPdf(
+    BuildContext context,
+    int spo2,
+    int heartRate,
+    double temperature,
+    String riskLevel,
+    int riskScore,
+  ) async {
+    try {
+      final riskEnum = riskLevel.toLowerCase() == 'faible'
+          ? RiskLevel.low
+          : riskLevel.toLowerCase() == 'moyen'
+              ? RiskLevel.medium
+              : RiskLevel.high;
+
+      final fakeTest = TestResultModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: '',
+        deviceId: '',
+        testDate: DateTime.now(),
+        spo2: spo2.toDouble(),
+        heartRate: heartRate,
+        temperature: temperature,
+        audioFileUrl: '',
+        audioDuration: 0,
+        audioQuality: 'good',
+        riskScore: riskScore,
+        riskLevel: riskEnum,
+        status: TestStatus.completed,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      final bytes = await PdfExportService.generateReport(
+        test: fakeTest,
+        patientName: 'Patient',
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (_) => bytes,
+        name: 'RespiraBox_Rapport_${DateTime.now().day}-${DateTime.now().month}.pdf',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur export PDF: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   static String _getShareInterpretation(String riskLevel) {

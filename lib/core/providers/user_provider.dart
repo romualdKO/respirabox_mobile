@@ -1,22 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/user_model.dart';
 import '../../data/services/auth_service.dart';
+import 'app_providers.dart';
 
-/// 👤 PROVIDER UTILISATEUR GLOBAL
-/// Gère l'état de l'utilisateur connecté dans toute l'application
-
-// Provider AuthService
-final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService();
-});
-
-// Provider UserModel (utilisateur connecté)
-final currentUserProvider =
+/// Provider StateNotifier pour gérer les actions sur l'utilisateur connecté.
+/// Pour lire l'utilisateur courant, utiliser [currentUserProvider] de app_providers.dart.
+final userNotifierProvider =
     StateNotifierProvider<UserNotifier, AsyncValue<UserModel?>>((ref) {
   return UserNotifier(ref.read(authServiceProvider));
 });
 
-/// Notifier pour gérer l'état utilisateur
 class UserNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   final AuthService _authService;
 
@@ -24,7 +17,6 @@ class UserNotifier extends StateNotifier<AsyncValue<UserModel?>> {
     loadUser();
   }
 
-  /// Charge les données utilisateur
   Future<void> loadUser() async {
     state = const AsyncValue.loading();
     try {
@@ -35,17 +27,10 @@ class UserNotifier extends StateNotifier<AsyncValue<UserModel?>> {
     }
   }
 
-  /// Rafraîchit les données utilisateur
-  Future<void> refresh() async {
-    await loadUser();
-  }
+  Future<void> refresh() async => await loadUser();
 
-  /// Met à jour l'utilisateur après modification
-  void updateUser(UserModel user) {
-    state = AsyncValue.data(user);
-  }
+  void updateUser(UserModel user) => state = AsyncValue.data(user);
 
-  /// Déconnexion
   Future<void> logout() async {
     await _authService.signOut();
     state = const AsyncValue.data(null);

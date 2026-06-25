@@ -3,12 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/providers/app_providers.dart';
-import '../../../data/services/auth_service.dart';
 import '../../../data/models/user_model.dart';
+import '../../../data/models/test_result_model.dart';
 import '../../../routes/app_routes.dart';
 import '../history/history_screen.dart';
 import '../profile/profile_screen.dart';
-import '../profile/profile_screen.dart';
+import '../../widgets/health_score_widget.dart';
 
 /// 🏠 ÉCRAN D'ACCUEIL PRINCIPAL AVEC BOTTOM NAVIGATION
 class MainHomeScreen extends ConsumerStatefulWidget {
@@ -83,8 +83,11 @@ class DashboardPage extends ConsumerStatefulWidget {
 class _DashboardPageState extends ConsumerState<DashboardPage> {
   @override
   Widget build(BuildContext context) {
-    // Récupérer l'utilisateur depuis le provider
     final userAsync = ref.watch(currentUserProvider);
+    final userId = userAsync.valueOrNull?.id ?? '';
+
+    final testsAsync = ref.watch(recentTestsProvider(userId));
+    final recentTests = testsAsync.valueOrNull ?? [];
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -92,45 +95,27 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // En-tête avec données utilisateur
-            userAsync.when(
-              data: (user) => _buildHeader(context, user),
-              loading: () => const CircularProgressIndicator(),
-              error: (_, __) => _buildHeader(context, null),
-            ),
+            _buildHeader(context, userAsync.valueOrNull, userId),
             const SizedBox(height: 30),
-
-            // Carte de bienvenue
-            _buildWelcomeCard(context),
+            _buildWelcomeCard(context, recentTests),
             const SizedBox(height: 25),
-
-            // Actions rapides
             Text('Actions rapides', style: AppTextStyles.h3),
             const SizedBox(height: 15),
             _buildQuickActions(context),
             const SizedBox(height: 30),
-
-            // Derniers tests
-            userAsync.when(
-              data: (user) => _buildLastTests(context, user?.id ?? ''),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const SizedBox.shrink(),
-            ),
+            _buildLastTests(context, userId),
             const SizedBox(height: 30),
-
-            // Statistiques
-            userAsync.when(
-              data: (user) => _buildStatistics(context, user?.id ?? ''),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const SizedBox.shrink(),
-            ),
+            _buildStatistics(context, userId),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, UserModel? user) {
+  Widget _buildHeader(BuildContext context, UserModel? user, String userId) {
+    final unreadCount =
+        ref.watch(unreadCountProvider(userId)).valueOrNull ?? 0;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -148,26 +133,54 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         InkWell(
           onTap: () => Navigator.pushNamed(context, AppRoutes.notifications),
           borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.notifications_outlined,
-                color: AppColors.primary),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.notifications_outlined,
+                    color: AppColors.primary),
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  right: -4,
+                  top: -4,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: const BoxDecoration(
+                      color: AppColors.error,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        unreadCount > 9 ? '9+' : '$unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildWelcomeCard(BuildContext context) {
+  Widget _buildWelcomeCard(BuildContext context, List<TestResultModel> tests) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [AppColors.primary, Color(0xFF26A69A)],
+          colors: [AppColors.primary, AppColors.primaryDark],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -203,25 +216,30 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   ),
                 ),
                 const SizedBox(height: 15),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: () {
                     Navigator.pushNamed(context, AppRoutes.deviceScan);
                   },
+                  icon: const Icon(Icons.bluetooth_searching, size: 18),
+                  label: const Text('Commencer'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: AppColors.primary,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
+                        horizontal: 16, vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text('Commencer'),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.medical_services, size: 80, color: Colors.white24),
+          const SizedBox(width: 12),
+          if (tests.isNotEmpty)
+            HealthScoreWidget(tests: tests)
+          else
+            const Icon(Icons.medical_services, size: 70, color: Colors.white24),
         ],
       ),
     );
@@ -322,27 +340,23 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             }
             return Column(
               children: tests.take(2).map((test) {
-                final riskColor = test.riskLevel == 'low'
+                final riskColor = test.riskLevel == RiskLevel.low
                     ? AppColors.success
-                    : test.riskLevel == 'moderate'
+                    : test.riskLevel == RiskLevel.medium
                         ? AppColors.warning
                         : AppColors.error;
-                final riskText = test.riskLevel == 'low'
+                final riskText = test.riskLevel == RiskLevel.low
                     ? 'Faible'
-                    : test.riskLevel == 'moderate'
+                    : test.riskLevel == RiskLevel.medium
                         ? 'Moyen'
                         : 'Élevé';
 
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _buildTestCard(
-                    date:
-                        '${test.testDate.day} ${_getMonthName(test.testDate.month)} ${test.testDate.year}',
-                    time:
-                        '${test.testDate.hour.toString().padLeft(2, '0')}:${test.testDate.minute.toString().padLeft(2, '0')}',
-                    riskLevel: riskText,
-                    spo2: (test.spo2 ?? 0).round(),
-                    heartRate: test.heartRate ?? 0,
+                  child: _buildEnrichedTestCard(
+                    context: context,
+                    test: test,
+                    riskText: riskText,
                     riskColor: riskColor,
                   ),
                 );
@@ -492,6 +506,120 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           ),
         ],
       ),
+    );
+  }
+
+  String _getRelativeTime(DateTime date) {
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 60) return 'Il y a ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'Il y a ${diff.inHours}h';
+    if (diff.inDays == 1) return 'Hier';
+    if (diff.inDays < 7) return 'Il y a ${diff.inDays} jours';
+    return '${date.day} ${_getMonthName(date.month)}';
+  }
+
+  Widget _buildEnrichedTestCard({
+    required BuildContext context,
+    required TestResultModel test,
+    required String riskText,
+    required Color riskColor,
+  }) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(
+        context,
+        AppRoutes.testResults,
+        arguments: {
+          'spo2': test.spo2,
+          'heartRate': test.heartRate,
+          'temperature': test.temperature,
+          'riskLevel': riskText,
+          'riskScore': test.riskScore,
+        },
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border(
+            left: BorderSide(color: riskColor, width: 4),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: riskColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(Icons.monitor_heart, color: riskColor, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _getRelativeTime(test.testDate),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      _vitaChip(Icons.air, '${test.spo2.round()}%', AppColors.info),
+                      const SizedBox(width: 6),
+                      _vitaChip(Icons.favorite, '${test.heartRate} bpm', AppColors.error),
+                      const SizedBox(width: 6),
+                      _vitaChip(Icons.thermostat, '${test.temperature.toStringAsFixed(1)}°', AppColors.warning),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: riskColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                riskText,
+                style: TextStyle(
+                  color: riskColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _vitaChip(IconData icon, String value, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 10, color: color),
+        const SizedBox(width: 2),
+        Text(
+          value,
+          style: TextStyle(fontSize: 10, color: AppColors.textLight),
+        ),
+      ],
     );
   }
 

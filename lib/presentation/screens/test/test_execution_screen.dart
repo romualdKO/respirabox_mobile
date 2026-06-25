@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../data/services/demo_data_service.dart';
+import '../../../data/services/patient_context_service.dart';
 import '../../../routes/app_routes.dart';
 
 /// 🫁 ÉCRAN D'EXÉCUTION DU TEST RESPIRATOIRE
@@ -29,10 +31,17 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
   double _temperature = 0.0;
   bool _isRecording = false;
 
+  // Statut synchronisation Arduino
+  bool _fingerOnSensor = false;
+  bool _sensorReady = false;
+  String _statusMessage = 'En attente du capteur...';
+
   // Accumulation des données pour la moyenne finale
   List<double> _spo2Values = [];
   List<double> _hrValues = [];
   List<double> _tempValues = [];
+
+  StreamSubscription<Map<String, dynamic>>? _demoSubscription;
 
   @override
   void initState() {
@@ -49,6 +58,7 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
   void dispose() {
     _animationController.dispose();
     _timer?.cancel();
+    _demoSubscription?.cancel();
     _stopTest();
     super.dispose();
   }
@@ -56,14 +66,38 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
   Future<void> _startTest() async {
     setState(() => _isRecording = true);
 
-    try {
-      // Envoyer START à l'ESP32
-      final deviceService = ref.read(respiraBoxServiceProvider);
-      await deviceService.startTest();
-      print('✅ Test démarré sur ESP32');
+    final isDemoMode = ref.read(isDemoModeProvider);
 
-      // Timer pour le compte à rebours
+    try {
+      if (isDemoMode) {
+        // Mode démo : écouter le stream simulé
+        setState(() {
+          _fingerOnSensor = true;
+          _sensorReady = true;
+          _statusMessage = 'Mode démonstration actif';
+        });
+        _demoSubscription = DemoDataService.simulateData().listen((data) {
+          if (mounted && _isRecording) {
+            setState(() {
+              _spo2 = (data['SPO2'] as double?) ?? _spo2;
+              _heartRate = (data['HR'] as double?) ?? _heartRate;
+              _temperature = (data['TEMP'] as double?) ?? _temperature;
+              if (_spo2 > 0) _spo2Values.add(_spo2);
+              if (_heartRate > 0) _hrValues.add(_heartRate);
+              if (_temperature > 0) _tempValues.add(_temperature);
+            });
+          }
+        });
+      } else {
+        // Mode réel : envoyer START à l'ESP32
+        final deviceService = ref.read(respiraBoxServiceProvider);
+        await deviceService.startTest();
+        if (mounted) print('✅ Test démarré sur ESP32');
+      }
+
+      // Timer pour le compte à rebours — s'arrête si le doigt est retiré
       _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!_fingerOnSensor && _spo2 == 0.0) return; // Pause si doigt absent
         if (_secondsRemaining > 0) {
           setState(() {
             _secondsRemaining--;
@@ -87,10 +121,13 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
   }
 
   Future<void> _stopTest() async {
+    _demoSubscription?.cancel();
+    _demoSubscription = null;
+    final isDemoMode = ref.read(isDemoModeProvider);
+    if (isDemoMode) return;
     try {
       final deviceService = ref.read(respiraBoxServiceProvider);
       await deviceService.stopTest();
-      print('⏹️ Test arrêté sur ESP32');
     } catch (e) {
       print('❌ Erreur arrêt test: $e');
     }
@@ -147,8 +184,14 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
           notes: 'Test de 30 secondes avec ESP32',
         );
 
-        print('✅ Test sauvegardé dans Firebase!');
-        print('   ID du test: ${savedTest.id}');
+        // Mémoriser les vitales pour le chatbot IA
+        await PatientContextService.saveLatestVitals(
+          spo2: avgSpo2,
+          temperature: avgTemp,
+          heartRate: avgHR.round(),
+        );
+
+        print('Test sauvegardé: ${savedTest.id}');
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -192,23 +235,58 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Écouter le stream de données ESP32
-    final deviceDataAsync = ref.watch(deviceDataStreamProvider);
+    final isDemoMode = ref.watch(isDemoModeProvider);
 
-    deviceDataAsync.whenData((data) {
-      if (mounted && _isRecording) {
-        setState(() {
-          _spo2 = data['SPO2'] ?? _spo2;
-          _heartRate = data['HR'] ?? _heartRate;
-          _temperature = data['TEMP'] ?? _temperature;
 
-          // Accumuler pour la moyenne
-          if (_spo2 > 0) _spo2Values.add(_spo2);
-          if (_heartRate > 0) _hrValues.add(_heartRate);
-          if (_temperature > 0) _tempValues.add(_temperature);
+    // Écouter les données ESP32 en temps réel (ref.listen = safe hors build)
+    if (!isDemoMode) {
+      ref.listen<AsyncValue<Map<String, dynamic>>>(deviceDataStreamProvider,
+          (_, next) {
+        next.whenData((data) {
+          if (!mounted || !_isRecording) return;
+          setState(() {
+            _spo2 = data['SPO2'] ?? _spo2;
+            _heartRate = data['HR'] ?? _heartRate;
+            _temperature = data['TEMP'] ?? _temperature;
+            if (_spo2 > 0) {
+              _fingerOnSensor = true;
+              _spo2Values.add(_spo2);
+            }
+            if (_heartRate > 0) _hrValues.add(_heartRate);
+            if (_temperature > 0) _tempValues.add(_temperature);
+          });
         });
-      }
-    });
+      });
+
+      ref.listen<AsyncValue<String>>(deviceStatusStreamProvider, (_, next) {
+        next.whenData((status) {
+          if (!mounted) return;
+          setState(() {
+            switch (status) {
+              case 'STATUS:FINGER_ON':
+                _fingerOnSensor = true;
+                _sensorReady = true;
+                _statusMessage = 'Doigt détecté — mesure en cours';
+                break;
+              case 'STATUS:FINGER_OFF':
+                _fingerOnSensor = false;
+                _statusMessage = 'Replacez le doigt sur le capteur';
+                break;
+              case 'STATUS:READY':
+                _sensorReady = true;
+                _statusMessage = 'Capteur prêt — posez le doigt';
+                break;
+              case 'ERROR:SENSOR_NOT_READY':
+                _sensorReady = false;
+                _statusMessage = 'Capteur non prêt — vérifiez le montage';
+                break;
+              default:
+                break;
+            }
+          });
+        });
+      });
+    }
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -226,7 +304,46 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
+
+              // Bandeau statut synchronisation Arduino
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _fingerOnSensor
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _fingerOnSensor ? Colors.green : Colors.orange,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _fingerOnSensor ? Icons.sensors : Icons.sensors_off,
+                      color: _fingerOnSensor ? Colors.green : Colors.orange,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        _statusMessage,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _fingerOnSensor ? Colors.green.shade700 : Colors.orange.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
 
               // Animation circulaire avec progression
               Expanded(
@@ -248,27 +365,53 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
                         ),
                       ),
 
-                      // Animation de respiration
+                      // Animation pulse médicale — 3 cercles concentriques
                       AnimatedBuilder(
                         animation: _animationController,
                         builder: (context, child) {
-                          final scale =
-                              1.0 + (_animationController.value * 0.2);
-                          return Transform.scale(
-                            scale: scale,
-                            child: Container(
-                              width: 180,
-                              height: 180,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.primary.withOpacity(0.1),
+                          final pulseColor = _spo2 >= 95
+                              ? AppColors.success
+                              : _spo2 >= 90
+                                  ? AppColors.warning
+                                  : _spo2 > 0
+                                      ? AppColors.error
+                                      : AppColors.primary;
+
+                          return Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Cercle externe (délai 0)
+                              _buildPulseRing(
+                                size: 180,
+                                phase: _animationController.value,
+                                color: pulseColor,
+                                opacity: 0.08,
                               ),
-                              child: const Icon(
-                                Icons.favorite,
-                                size: 80,
-                                color: AppColors.primary,
+                              // Cercle intermédiaire (délai 0.33)
+                              _buildPulseRing(
+                                size: 150,
+                                phase: ((_animationController.value + 0.33) % 1.0),
+                                color: pulseColor,
+                                opacity: 0.14,
                               ),
-                            ),
+                              // Cercle interne avec icône
+                              Transform.scale(
+                                scale: 0.92 + (_animationController.value * 0.08),
+                                child: Container(
+                                  width: 110,
+                                  height: 110,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: pulseColor.withOpacity(0.18),
+                                  ),
+                                  child: Icon(
+                                    Icons.favorite,
+                                    size: 54,
+                                    color: pulseColor,
+                                  ),
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -340,6 +483,27 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
               const SizedBox(height: 20),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPulseRing({
+    required double size,
+    required double phase,
+    required Color color,
+    required double opacity,
+  }) {
+    final scale = 0.85 + phase * 0.15;
+    final alpha = opacity * (1 - phase);
+    return Transform.scale(
+      scale: scale,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color.withOpacity(alpha),
         ),
       ),
     );

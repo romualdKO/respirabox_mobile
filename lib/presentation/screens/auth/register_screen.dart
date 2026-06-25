@@ -4,6 +4,73 @@ import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
 import '../../../data/services/auth_service.dart';
 
+// ── WIDGET CHECKBOX CONSENTEMENT ────────────────────────────────────────────
+class _ConsentCheckbox extends StatelessWidget {
+  final bool value;
+  final bool required;
+  final String label;
+  final ValueChanged<bool?> onChanged;
+
+  const _ConsentCheckbox({
+    required this.value,
+    required this.required,
+    required this.label,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: value,
+              onChanged: onChanged,
+              activeColor: AppColors.primary,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4)),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(!value),
+              child: RichText(
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                        height: 1.4,
+                      ),
+                    ),
+                    if (required)
+                      const TextSpan(
+                        text: ' *',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// 📝 ÉCRAN D'INSCRIPTION
 /// Permet à un nouvel utilisateur de créer un compte
 class RegisterScreen extends StatefulWidget {
@@ -29,6 +96,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isConfirmPasswordVisible = false;
   bool _isLoading = false;
   String? _errorMessage;
+
+  // Consentements
+  bool _consentPrivacy = false;
+  bool _consentDataProcessing = false;
+  bool _consentMedical = false;
+  bool _consentNotifications = false;
 
   @override
   void dispose() {
@@ -71,6 +144,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_selectedDate == null) {
       setState(() {
         _errorMessage = 'Veuillez sélectionner votre date de naissance';
+      });
+      return;
+    }
+
+    if (!_consentPrivacy || !_consentDataProcessing || !_consentMedical) {
+      setState(() {
+        _errorMessage =
+            'Veuillez accepter les conditions obligatoires (cases 1, 2 et 3) pour continuer.';
       });
       return;
     }
@@ -412,6 +493,78 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+
+                // ── FORMULAIRE DE CONSENTEMENT ──────────────────────
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F7FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.shield_outlined,
+                              color: AppColors.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Formulaire de consentement',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Dans l\'optique de vous fournir les services de cette application, '
+                        'certaines de vos données sont nécessaires. En poursuivant, vous reconnaissez '
+                        'avoir pris connaissance de notre politique de confidentialité.\n\n'
+                        'Les informations collectées sont : votre nom et prénom, date de naissance, '
+                        'âge, et autres informations de profil. Ces données ne servent qu\'à la gestion '
+                        'de votre compte et au fonctionnement de l\'application.\n\n'
+                        'Les résultats de l\'application peuvent être inexacts. Il s\'agit d\'une piste '
+                        'à vérifier auprès d\'un médecin professionnel. Vous pouvez retirer votre '
+                        'consentement à tout moment.',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _ConsentCheckbox(
+                        value: _consentPrivacy,
+                        required: true,
+                        label: 'J\'ai lu et compris la politique de confidentialité.',
+                        onChanged: (v) => setState(() => _consentPrivacy = v!),
+                      ),
+                      _ConsentCheckbox(
+                        value: _consentDataProcessing,
+                        required: true,
+                        label: 'J\'accepte le traitement de mes informations personnelles.',
+                        onChanged: (v) => setState(() => _consentDataProcessing = v!),
+                      ),
+                      _ConsentCheckbox(
+                        value: _consentMedical,
+                        required: true,
+                        label: 'Je m\'engage à consulter un centre de santé après pour plus de fiabilité.',
+                        onChanged: (v) => setState(() => _consentMedical = v!),
+                      ),
+                      _ConsentCheckbox(
+                        value: _consentNotifications,
+                        required: false,
+                        label: 'J\'accepte de recevoir les notifications relatives à l\'application.',
+                        onChanged: (v) => setState(() => _consentNotifications = v!),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
 

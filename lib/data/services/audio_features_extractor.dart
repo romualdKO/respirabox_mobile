@@ -125,10 +125,10 @@ class AudioFeaturesExtractor {
     }
   }
 
-  /// 📂 CHARGER FICHIER AUDIO
+  /// 📂 CHARGER FICHIER AUDIO WAV → samples PCM 16-bit
   ///
-  /// Simplifié pour prototype - convertit les bytes en samples PCM
-  /// TODO: Utiliser ffmpeg ou flutter_ffmpeg pour décoder AAC/MP3
+  /// Lit le fichier WAV en sautant l'entête RIFF (44 bytes standard).
+  /// Le codec d'enregistrement doit être pcm16WAV (flutter_sound).
   static Future<List<double>> _loadAudioFile(String filePath) async {
     try {
       final file = File(filePath);
@@ -139,20 +139,29 @@ class AudioFeaturesExtractor {
       }
 
       final bytes = await file.readAsBytes();
+      print('📂 Fichier: ${bytes.length} bytes');
 
-      // SIMPLIFIÉ: Interpréter raw bytes comme PCM 16-bit
-      // Pour production: utiliser package audio_decoder ou flutter_ffmpeg
+      // Trouver le début des données PCM en cherchant "data" chunk dans l'entête WAV
+      int dataOffset = 44; // Entête WAV standard
+      for (int i = 0; i < min(200, bytes.length - 4); i++) {
+        // Chercher le marqueur "data" (0x64617461)
+        if (bytes[i] == 0x64 && bytes[i + 1] == 0x61 &&
+            bytes[i + 2] == 0x74 && bytes[i + 3] == 0x61) {
+          dataOffset = i + 8; // "data" + 4 bytes taille chunk
+          break;
+        }
+      }
+
+      print('📂 Données PCM démarrent à l\'octet $dataOffset');
+
       final samples = <double>[];
-
-      for (int i = 0; i < bytes.length - 1; i += 2) {
-        // Lire 16-bit little-endian signed integer
+      for (int i = dataOffset; i < bytes.length - 1; i += 2) {
         final sample = bytes[i] | (bytes[i + 1] << 8);
         final signedSample = sample > 32767 ? sample - 65536 : sample;
-
-        // Normaliser à [-1, 1]
         samples.add(signedSample / 32768.0);
       }
 
+      print('📂 ${samples.length} samples PCM extraits');
       return samples.length > 100 ? samples : _generateSyntheticCough();
     } catch (e) {
       print('⚠️ Erreur lecture audio, génération signal synthétique: $e');
@@ -475,7 +484,7 @@ class AudioFeaturesExtractor {
   /// Trouve les pics d'énergie dans le signal (chaque pic = une toux)
   static List<double> _detectEnergyPeaks(List<double> samples) {
     const int windowSize = sampleRate ~/ 10; // Fenêtre 100ms
-    const double threshold = 0.3; // Seuil énergie minimale
+    const double threshold = 0.05; // Seuil bas: 5% RMS (couvre toux faibles)
 
     final peaks = <double>[];
 

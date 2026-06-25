@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import '../models/notification_model.dart';
 
 /// 🔔 SERVICE DE GESTION DES NOTIFICATIONS
@@ -12,58 +14,98 @@ class NotificationService {
   CollectionReference get _notificationsCollection =>
       _firestore.collection('notifications');
 
-  /// 🔧 INITIALISER FCM (Firebase Cloud Messaging)
+  /// INITIALISER FCM (Firebase Cloud Messaging)
   Future<void> initFCM() async {
     try {
-      // Demander la permission d'afficher des notifications
-      NotificationSettings settings = await _messaging.requestPermission(
+      final settings = await _messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
         provisional: false,
       );
 
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        print('✅ Permission notifications accordée');
-
-        // Récupérer le token FCM
-        String? token = await _messaging.getToken();
-        print('📱 Token FCM: $token');
-
-        // TODO: Sauvegarder le token dans Firestore pour envoyer des notifications
-
-        // Écouter les notifications en premier plan
-        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-          print('📩 Notification reçue: ${message.notification?.title}');
-          _handleForegroundNotification(message);
-        });
-
-        // Notification cliquée quand l'app est en arrière-plan
-        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-          print('🔔 Notification cliquée: ${message.notification?.title}');
-          _handleNotificationTap(message);
-        });
-      } else {
-        print('❌ Permission notifications refusée');
+      if (settings.authorizationStatus != AuthorizationStatus.authorized) {
+        print('[FCM] Permission refusée');
+        return;
       }
+
+      // Récupérer et sauvegarder le token FCM dans Firestore
+      final token = await _messaging.getToken();
+      if (token != null) {
+        print('[FCM] Token: $token');
+        await _saveFcmToken(token);
+      }
+
+      // Rafraîchissement automatique du token
+      _messaging.onTokenRefresh.listen(_saveFcmToken);
+
+      // Notifications reçues quand l'app est au premier plan
+      FirebaseMessaging.onMessage.listen(_handleForegroundNotification);
+
+      // Notification cliquée depuis l'arrière-plan
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+
+      print('[FCM] Initialisation réussie');
     } catch (e) {
-      print('❌ Erreur initialisation FCM: $e');
+      print('[FCM] Erreur initialisation: $e');
     }
   }
 
-  /// 📩 GÉRER NOTIFICATION EN PREMIER PLAN
+  /// Sauvegarde le token FCM dans Firestore pour l'utilisateur connecté
+  Future<void> _saveFcmToken(String token) async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+      await _firestore.collection('users').doc(uid).update({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+        'platform': defaultTargetPlatform.name,
+      });
+      if (kDebugMode) print('[FCM] Token sauvegardé pour $uid');
+    } catch (e) {
+      print('[FCM] Erreur sauvegarde token: $e');
+    }
+  }
+
+  /// Sauvegarde le token FCM pour un utilisateur spécifique
+  Future<void> saveFcmTokenForUser(String userId, String token) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'fcmToken': token,
+        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('[FCM] Erreur mise à jour token utilisateur: $e');
+    }
+  }
+
+  /// Notification reçue en premier plan : crée une notification Firestore
   void _handleForegroundNotification(RemoteMessage message) {
-    // Afficher une notification locale
-    // TODO: Implémenter avec flutter_local_notifications si besoin
+    final title = message.notification?.title ?? 'RespiraBox';
+    final body  = message.notification?.body  ?? '';
+    print('[FCM] Notification premier plan: $title — $body');
+
+    // Persister dans Firestore pour affichage dans l'écran Notifications
+    if (message.data['userId'] != null) {
+      createNotification(NotificationModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: message.data['userId'] as String,
+        type: NotificationType.info,
+        title: title,
+        message: body,
+        actionRoute: message.data['route'] as String?,
+        data: message.data,
+        createdAt: DateTime.now(),
+      ));
+    }
   }
 
-  /// 👆 GÉRER LE CLIC SUR NOTIFICATION
+  /// Notification cliquée depuis l'arrière-plan : navigation vers la route
   void _handleNotificationTap(RemoteMessage message) {
-    // Naviguer vers l'écran approprié
-    final route = message.data['route'];
-    if (route != null) {
-      // TODO: Navigator.pushNamed(context, route);
-    }
+    final route = message.data['route'] as String?;
+    print('[FCM] Tap notification, route: $route');
+    // La navigation est gérée par le NavigatorKey global de l'app
+    // navigatorKey.currentState?.pushNamed(route); ← activer si NavigatorKey configuré
   }
 
   /// ➕ CRÉER UNE NOTIFICATION
@@ -281,7 +323,9 @@ class NotificationService {
 
       final tests = testsSnapshot.docs;
       final lastTest = tests.first.data();
-      final lastTestDate = (lastTest['testDate'] as Timestamp).toDate();
+      final testDateRaw = lastTest['testDate'];
+      if (testDateRaw == null) return;
+      final lastTestDate = (testDateRaw as Timestamp).toDate();
       final daysSinceLastTest = DateTime.now().difference(lastTestDate).inDays;
 
       // Analyser le niveau de risque moyen

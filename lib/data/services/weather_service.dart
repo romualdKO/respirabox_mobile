@@ -1,117 +1,104 @@
-import 'dart:math';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../../core/constants/app_constants.dart';
 
-/// Service pour générer une température ambiante réaliste
-/// Basé sur le climat tropical de Côte d'Ivoire (Abidjan)
+/// SERVICE MÉTÉO — OpenWeatherMap
+/// Récupère les données météo environnementales pour Abidjan.
+/// Clé API : définir OPENWEATHER_API_KEY via --dart-define ou .env
 class WeatherService {
-  // Dernière température générée pour cohérence
-  static double? _lastTemperature;
-  static DateTime? _lastUpdateTime;
+  static const String _baseUrl = AppConstants.openWeatherBaseUrl;
+  static const double _lat     = AppConstants.defaultLatitude;
+  static const double _lon     = AppConstants.defaultLongitude;
 
-  // Paramètres climatiques Côte d'Ivoire
-  static const double _tempMin = 24.0; // Nuit/Pluie
-  static const double _tempMax = 32.0; // Journée chaude
-  static const double _tempMoyenne = 27.5;
+  // Cache pour éviter les requêtes trop fréquentes
+  static Map<String, dynamic>? _cachedData;
+  static DateTime? _lastFetch;
+  static const Duration _cacheDuration = Duration(minutes: 10);
 
-  /// Récupère une température ambiante réaliste
-  /// Varie selon l'heure de la journée avec petites fluctuations
-  static Future<double> getAmbientTemperature() async {
+  /// Récupère les données météo actuelles
+  /// Retourne les données de l'API ou des valeurs par défaut si indisponible
+  static Future<Map<String, dynamic>> getWeatherInfo() async {
+    // Retourner le cache si récent
+    if (_cachedData != null &&
+        _lastFetch != null &&
+        DateTime.now().difference(_lastFetch!) < _cacheDuration) {
+      return _cachedData!;
+    }
+
+    final apiKey = AppConstants.openWeatherApiKey;
+
+    if (apiKey.isEmpty) {
+      print('[WeatherService] Clé API non configurée — données météo indisponibles');
+      return _defaultWeatherData();
+    }
+
     try {
-      final now = DateTime.now();
+      final uri = Uri.parse(
+        '$_baseUrl/weather?lat=$_lat&lon=$_lon&appid=$apiKey&units=metric&lang=fr',
+      );
 
-      // Si dernière mesure < 2 minutes, retourner valeur stable avec micro-variation
-      if (_lastTemperature != null &&
-          _lastUpdateTime != null &&
-          now.difference(_lastUpdateTime!).inMinutes < 2) {
-        // Micro-variation ±0.1°C pour simulation réaliste
-        final variation = (Random().nextDouble() - 0.5) * 0.2;
-        _lastTemperature = _lastTemperature! + variation;
-        _lastTemperature = _lastTemperature!.clamp(_tempMin, _tempMax);
+      final response = await http.get(uri).timeout(const Duration(seconds: 8));
 
-        print(
-            '🌡️ Température stable: ${_lastTemperature!.toStringAsFixed(1)}°C');
-        return _lastTemperature!;
-      }
+      if (response.statusCode == 200) {
+        final raw = jsonDecode(response.body) as Map<String, dynamic>;
 
-      // Générer température basée sur l'heure (cycle jour/nuit)
-      final hour = now.hour;
-      double baseTemp;
+        final mainData = raw['main'] as Map<String, dynamic>? ?? {};
+        final windData = raw['wind'] as Map<String, dynamic>? ?? {};
+        final sysData  = raw['sys']  as Map<String, dynamic>? ?? {};
+        final weatherList = raw['weather'] as List? ?? [];
 
-      if (hour >= 6 && hour < 12) {
-        // Matin: 25-28°C (montée progressive)
-        baseTemp = 25.0 + ((hour - 6) / 6) * 3.0;
-      } else if (hour >= 12 && hour < 16) {
-        // Après-midi: 28-32°C (pic de chaleur)
-        baseTemp = 28.0 + ((hour - 12) / 4) * 4.0;
-      } else if (hour >= 16 && hour < 22) {
-        // Soirée: 32-26°C (descente)
-        baseTemp = 32.0 - ((hour - 16) / 6) * 6.0;
+        final data = {
+          'temperature': (mainData['temp'] as num?)?.toDouble() ?? 27.5,
+          'humidity':    (mainData['humidity'] as num?)?.toInt() ?? 80,
+          'pressure':    (mainData['pressure'] as num?)?.toInt() ?? 1013,
+          'description': weatherList.isNotEmpty
+              ? ((weatherList.first as Map)['description'] as String? ?? 'N/A')
+              : 'N/A',
+          'city':        raw['name'] as String? ?? 'Abidjan',
+          'country':     sysData['country'] as String? ?? 'CI',
+          'windSpeed':   (windData['speed'] as num?)?.toDouble() ?? 0.0,
+          'feelsLike':   (mainData['feels_like'] as num?)?.toDouble() ?? 27.5,
+          'source':      'openweathermap',
+          'isDefault':   false,
+        };
+
+        _cachedData = data;
+        _lastFetch  = DateTime.now();
+        return data;
       } else {
-        // Nuit: 24-25°C (stable)
-        baseTemp = 24.0 + Random().nextDouble();
+        print('[WeatherService] Erreur API: ${response.statusCode}');
+        return _defaultWeatherData();
       }
-
-      // Ajouter variation aléatoire ±1°C pour réalisme
-      final variation = (Random().nextDouble() - 0.5) * 2.0;
-      final temperature = (baseTemp + variation).clamp(_tempMin, _tempMax);
-
-      // Mettre en cache
-      _lastTemperature = temperature;
-      _lastUpdateTime = now;
-
-      print(
-          '✅ Température ambiante: ${temperature.toStringAsFixed(1)}°C (${_getPeriodName(hour)})');
-      return temperature;
     } catch (e) {
-      print('❌ Erreur génération température: $e');
-      return _tempMoyenne;
+      print('[WeatherService] Erreur réseau: $e');
+      return _defaultWeatherData();
     }
   }
 
-  /// Retourne le nom de la période de la journée
-  static String _getPeriodName(int hour) {
-    if (hour >= 6 && hour < 12) return 'Matin';
-    if (hour >= 12 && hour < 16) return 'Après-midi';
-    if (hour >= 16 && hour < 22) return 'Soirée';
-    return 'Nuit';
+  /// Température ambiante uniquement (version allégée)
+  static Future<double> getAmbientTemperature() async {
+    final info = await getWeatherInfo();
+    return (info['temperature'] as num).toDouble();
   }
 
-  /// Retourne les informations météo simulées pour Abidjan
-  static Future<Map<String, dynamic>> getWeatherInfo() async {
-    final temp = await getAmbientTemperature();
-    final hour = DateTime.now().hour;
-
+  /// Données météo par défaut quand l'API est indisponible
+  static Map<String, dynamic> _defaultWeatherData() {
     return {
-      'temperature': temp,
-      'humidity': 75 + Random().nextInt(15), // 75-90%
-      'pressure': 1010 + Random().nextInt(10), // 1010-1020 hPa
-      'description': _getWeatherDescription(hour),
-      'city': 'Abidjan',
-      'country': 'CI',
+      'temperature': 27.5,
+      'humidity':    80,
+      'pressure':    1013,
+      'description': 'Données indisponibles',
+      'city':        'Abidjan',
+      'country':     'CI',
+      'windSpeed':   0.0,
+      'feelsLike':   27.5,
+      'source':      'default',
     };
   }
 
-  /// Génère une description météo réaliste
-  static String _getWeatherDescription(int hour) {
-    final random = Random().nextDouble();
-
-    // Saison des pluies (avril-juillet, octobre-novembre)
-    final month = DateTime.now().month;
-    final isRainySeason =
-        (month >= 4 && month <= 7) || (month >= 10 && month <= 11);
-
-    if (isRainySeason && random > 0.6) {
-      return 'Nuageux avec averses';
-    } else if (hour >= 6 && hour < 18) {
-      return random > 0.7 ? 'Ensoleillé' : 'Partiellement nuageux';
-    } else {
-      return 'Ciel dégagé';
-    }
-  }
-
-  /// Efface le cache
+  /// Efface le cache (forcer une nouvelle requête)
   static void clearCache() {
-    _lastTemperature = null;
-    _lastUpdateTime = null;
-    print('🗑️ Cache température effacé');
+    _cachedData = null;
+    _lastFetch  = null;
   }
 }
