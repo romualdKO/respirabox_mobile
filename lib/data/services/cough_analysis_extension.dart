@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:math';
 import 'audio_features_extractor.dart';
 
 /// 🧪 EXTENSION D'ANALYSE DE TOUX INTELLIGENTE AVANCÉE
@@ -42,7 +40,6 @@ class CoughAnalysisHelper {
 
     // Contexte patient — vitales ESP32 + profil Firestore
     int? patientAge = patientContext?['age'];
-    String? patientGender = patientContext?['gender'];
     double? currentSpO2 = patientContext?['spo2'];
     double? currentTemp = patientContext?['temperature'];
     int? currentHR = patientContext?['heartRate'];
@@ -95,8 +92,8 @@ class CoughAnalysisHelper {
     print(
         '   ➡️ Résultat final: ${hasCough ? "TOUX DÉTECTÉE ✅" : "PAS DE TOUX ❌"}');
 
-    // Estimation du nombre de toux (basé sur durée et patterns acoustiques)
-    int estimatedCoughCount = (duration / 3).ceil(); // Baseline
+    // Estimation du nombre de toux (durée / ~3s par épisode de toux)
+    int estimatedCoughCount = duration > 0 ? (duration / 3).ceil() : 1;
 
     // ========================================
     // 2️⃣ CLASSIFICATION TYPE DE TOUX (basé sur acoustique)
@@ -123,8 +120,6 @@ class CoughAnalysisHelper {
     if (audioFeatures != null) {
       // Analyse spectrale
       double lowFreqEnergy = spectralFeatures['lowBand'] ?? 0.0; // 0-500 Hz
-      double midFreqEnergy = spectralFeatures['midBand'] ?? 0.0; // 500-2000 Hz
-      double highFreqEnergy = spectralFeatures['highBand'] ?? 0.0; // 2000+ Hz
 
       // Calcul probabilité "wetness" (toux grasse)
       wetnessProbability += lowFreqEnergy * 0.4; // Basses fréquences = mucus
@@ -162,7 +157,6 @@ class CoughAnalysisHelper {
     // ========================================
 
     String intensity = 'légère';
-    int intensityScore = 0;
 
     // Critères acoustiques pour intensité
     double intensityPoints = 0.0;
@@ -172,13 +166,10 @@ class CoughAnalysisHelper {
 
     if (intensityPoints > 70) {
       intensity = 'sévère';
-      intensityScore = 3;
     } else if (intensityPoints > 40) {
       intensity = 'modérée';
-      intensityScore = 2;
     } else {
       intensity = 'légère';
-      intensityScore = 1;
     }
 
     // ========================================
@@ -359,9 +350,10 @@ class CoughAnalysisHelper {
     // 6️⃣ RETOUR RÉSULTATS COMPLETS
     // ========================================
 
-    // ========================================
-    // 6️⃣ RETOUR RÉSULTATS COMPLETS
-    // ========================================
+    // Score de confiance global (0-100) basé sur la qualité des données
+    final int dataQuality = (audioFeatures != null ? 40 : 0) +
+        (patientContext != null ? 40 : 0) +
+        (symptomDurationDays > 0 ? 20 : 0);
 
     return {
       // Détection toux - AMÉLIORÉE (ne dépend plus uniquement de la transcription)
@@ -430,10 +422,11 @@ class CoughAnalysisHelper {
 
       // Métadonnées analyse
       'analysisMetadata': {
-        'version': '2.0',
+        'version': '2.1',
         'algorithm': 'acoustic-ml-enhanced',
         'hasAudioFeatures': audioFeatures != null,
         'hasPatientContext': patientContext != null,
+        'dataQuality': dataQuality,
         'analysisDate': DateTime.now().toIso8601String(),
       },
     };

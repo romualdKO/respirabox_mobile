@@ -107,8 +107,8 @@ class HelpScreen extends StatelessWidget {
         ContentSection(
           title: 'Besoin d\'aide supplémentaire ?',
           content: 'Contactez notre équipe support:\n'
-              '📧 Email: support@respirabox.ci\n'
-              '📞 Téléphone: +225 0574432780\n'
+              '📧 Email: eunicekobia55@gmail.com\n'
+              '📞 Téléphone: +225 05 59 01 90 43\n'
               '🕐 Horaires: Lun-Ven 8h-18h',
         ),
       ],
@@ -126,7 +126,7 @@ class PrivacyScreen extends StatelessWidget {
       title: 'Politique de confidentialité',
       sections: [
         ContentSection(
-          content: 'Dernière mise à jour: 16 décembre 2025\n\n'
+          content: 'Dernière mise à jour: 25 juin 2026\n\n'
               'RespiraBox s\'engage à protéger votre vie privée et vos données personnelles. '
               'Cette politique explique comment nous collectons, utilisons et protégeons vos informations.',
         ),
@@ -176,7 +176,8 @@ class PrivacyScreen extends StatelessWidget {
         ContentSection(
           title: '6. Contact',
           content: 'Pour toute question sur cette politique:\n'
-              'Email: privacy@respirabox.ci\n'
+              'Email: eunicekobia55@gmail.com\n'
+              'Téléphone: +225 05 59 01 90 43\n'
               'Adresse: Abidjan, Côte d\'Ivoire',
         ),
       ],
@@ -194,7 +195,7 @@ class TermsScreen extends StatelessWidget {
       title: 'Conditions d\'utilisation',
       sections: [
         ContentSection(
-          content: 'Dernière mise à jour: 16 décembre 2025\n\n'
+          content: 'Dernière mise à jour: 25 juin 2026\n\n'
               'En utilisant RespiraBox, vous acceptez les présentes conditions d\'utilisation.',
         ),
         ContentSection(
@@ -352,8 +353,8 @@ class AboutScreen extends StatelessWidget {
             _buildInfoCard(
               icon: Icons.email,
               title: 'Contact',
-              content: '📧 support@respirabox.ci\n'
-                  '📞 +225 XX XX XX XX XX\n'
+              content: '📧 eunicekobia55@gmail.com\n'
+                  '📞 +225 05 59 01 90 43\n'
                   '🌐 www.respirabox.ci\n'
                   '📍 Abidjan, Côte d\'Ivoire',
             ),

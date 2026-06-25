@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 import '../../../core/constants/colors.dart';
-import '../../../core/constants/text_styles.dart';
 import '../../../data/services/gemini_ai_service.dart';
 import '../../../data/services/assemblyai_service.dart';
 import '../../../data/services/conversation_service.dart';
@@ -36,7 +34,6 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   // 🎤 Enregistrement vocal avec flutter_sound
   final FlutterSoundRecorder _audioRecorder = FlutterSoundRecorder();
   bool _isRecording = false;
-  String? _recordingPath;
 
   // 🆕 SÉPARATION: Transcription vs Analyse toux
   bool _isRecordingForTranscription = false; // Enregistrement pour parler
@@ -407,7 +404,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
         setState(() {
           _isRecordingForTranscription = true;
           _isRecording = true;
-          _recordingPath = filePath;
+
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -621,7 +618,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
         setState(() {
           _isRecordingForCough = true;
           _isRecording = true;
-          _recordingPath = filePath;
+
         });
 
         ScaffoldMessenger.of(context).showSnackBar(

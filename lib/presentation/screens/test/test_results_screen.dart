@@ -6,7 +6,6 @@ import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
 import '../../../data/models/test_result_model.dart';
 import '../../../data/services/patient_context_service.dart';
-import '../../../data/services/cough_analysis_extension.dart';
 import '../../../data/services/pdf_export_service.dart';
 import '../../widgets/disease_risk_comparison_chart.dart';
 

@@ -195,32 +195,34 @@ class AuthService {
         if (userDoc.exists) {
           // Utilisateur existant, récupérer ses données
           return UserModel.fromFirestore(userDoc);
-        } else {
-          // Nouvel utilisateur, créer son profil
-          final nameParts = (googleUser.displayName ?? '').split(' ');
-          final newUser = UserModel(
-            id: firebaseUser.uid,
-            firstName: nameParts.isNotEmpty ? nameParts[0] : 'Utilisateur',
-            lastName:
-                nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
-            email: firebaseUser.email ?? googleUser.email,
-            phoneNumber: firebaseUser.phoneNumber,
-            gender: 'other',
-            profileImageUrl: googleUser.photoUrl,
-            role: UserRole.patient,
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-            isActive: true,
-          );
-
-          // Sauvegarder dans Firestore
-          await _firestore
-              .collection('users')
-              .doc(newUser.id)
-              .set(newUser.toFirestore());
-
-          return newUser;
         }
+
+        // Nouvel utilisateur — créer et persister son profil
+        final nameParts =
+            (googleUser.displayName ?? firebaseUser.displayName ?? '')
+                .split(' ');
+        final newUser = UserModel(
+          id: firebaseUser.uid,
+          firstName: nameParts.isNotEmpty ? nameParts[0] : 'Utilisateur',
+          lastName:
+              nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
+          email: firebaseUser.email ?? googleUser.email,
+          phoneNumber: firebaseUser.phoneNumber,
+          gender: 'other',
+          profileImageUrl: googleUser.photoUrl ?? firebaseUser.photoURL,
+          role: UserRole.patient,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          isActive: true,
+        );
+
+        // Sauvegarder dans Firestore et ATTENDRE la confirmation
+        await _firestore
+            .collection('users')
+            .doc(newUser.id)
+            .set(newUser.toFirestore());
+
+        return newUser;
       }
       return null;
     } on FirebaseAuthException catch (e) {
@@ -242,6 +244,34 @@ class AuthService {
       if (docSnapshot.exists) {
         return UserModel.fromFirestore(docSnapshot);
       }
+
+      // Profil absent = nouvel utilisateur Google Sign-In (condition de course)
+      // On recrée le profil automatiquement depuis les données Firebase Auth
+      final isGoogleUser =
+          user.providerData.any((p) => p.providerId == 'google.com');
+      if (isGoogleUser) {
+        final nameParts = (user.displayName ?? '').split(' ');
+        final newUser = UserModel(
+          id: user.uid,
+          firstName: nameParts.isNotEmpty ? nameParts[0] : 'Utilisateur',
+          lastName:
+              nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '',
+          email: user.email ?? '',
+          phoneNumber: user.phoneNumber,
+          gender: 'other',
+          profileImageUrl: user.photoURL,
+          role: UserRole.patient,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          isActive: true,
+        );
+        await _firestore
+            .collection('users')
+            .doc(newUser.id)
+            .set(newUser.toFirestore());
+        return newUser;
+      }
+
       return null;
     } catch (e) {
       throw 'Erreur lors de la récupération des données: $e';

@@ -34,8 +34,6 @@ class CoughAnalysisResultsScreen extends StatelessWidget {
 
     final coughType = args['type'] as String? ?? 'non défini';
     final intensity = args['intensity'] as String? ?? 'non défini';
-    final tbRisk = args['tbRisk'] as int? ?? 0;
-    final pneumoniaRisk = args['pneumoniaRisk'] as int? ?? 0;
     final urgencyLevel = args['urgencyLevel'] as String? ?? 'low';
     final recommendation = args['recommendation'] as String? ?? '';
     final actions = (args['actions'] as List?)?.cast<String>() ?? [];

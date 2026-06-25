@@ -883,6 +883,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           );
         }
 
+        // Supprimer l'ancienne photo si elle existe dans Firebase Storage
+        final oldUrl = _currentUser?.profileImageUrl;
+        if (oldUrl != null &&
+            oldUrl.isNotEmpty &&
+            oldUrl.contains('firebase')) {
+          try {
+            await FirebaseStorage.instance.refFromURL(oldUrl).delete();
+          } catch (_) {
+            // Ignorer si déjà supprimé ou URL invalide
+          }
+        }
+
         // Upload vers Firebase Storage
         final storage = FirebaseStorage.instance;
         final fileName =
@@ -898,15 +910,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
         // Récupérer l'URL publique
         final downloadUrl = await storageRef.getDownloadURL();
-        // Mettre à jour avec l'URL Firebase
-        setState(() {
-          _currentUser = _currentUser?.copyWith(
-            profileImageUrl: downloadUrl,
-          );
-        });
 
-        // Sauvegarder directement dans Firestore avec l'URL
-        await _authService.updateUserProfile(_currentUser!);
+        // Mettre à jour localement puis sauvegarder dans Firestore
+        final updatedUser = _currentUser!.copyWith(
+          profileImageUrl: downloadUrl,
+          updatedAt: DateTime.now(),
+        );
+        setState(() => _currentUser = updatedUser);
+        await _authService.updateUserProfile(updatedUser);
 
         if (mounted) {
           ScaffoldMessenger.of(context).clearSnackBars();
@@ -931,17 +942,39 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  // Supprimer la photo de profil
-  void _removeProfileImage() {
-    setState(() {
-      _currentUser = _currentUser?.copyWith(profileImageUrl: null);
-    });
+  // Supprimer la photo de profil (Storage + Firestore)
+  Future<void> _removeProfileImage() async {
+    final oldUrl = _currentUser?.profileImageUrl;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Photo de profil supprimée'),
-      ),
-    );
+    // Supprimer le fichier dans Firebase Storage si c'est un fichier uploadé
+    if (oldUrl != null && oldUrl.isNotEmpty && oldUrl.contains('firebase')) {
+      try {
+        await FirebaseStorage.instance.refFromURL(oldUrl).delete();
+      } catch (_) {
+        // Ignorer si déjà supprimé
+      }
+    }
+
+    // Mettre à jour le profil sans photo
+    if (_currentUser != null) {
+      final updatedUser = _currentUser!.copyWith(
+        profileImageUrl: null,
+        updatedAt: DateTime.now(),
+      );
+      setState(() => _currentUser = updatedUser);
+      try {
+        await _authService.updateUserProfile(updatedUser);
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Photo de profil supprimée'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    }
   }
 
   // Changement de mot de passe

@@ -1,7 +1,6 @@
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/test_result_model.dart';
-import 'weather_service.dart';
 import 'dart:async';
 
 /// 📱 SERVICE RESPIRABOX DEVICE
@@ -34,33 +33,31 @@ class RespiraBoxDeviceService {
   /// État de connexion
   bool get isConnected => _connectedDevice != null;
 
-  /// 🔍 SCANNER LES DEVICES BLUETOOTH (UNIQUEMENT RESPIRABOX)
+  /// 🔍 SCANNER TOUS LES DEVICES BLUETOOTH
   Future<List<ScanResult>> scanForDevices(
       {Duration timeout = const Duration(seconds: 15)}) async {
-    List<ScanResult> foundResults = [];
-
     try {
       final adapterState = await FlutterBluePlus.adapterState.first;
       if (adapterState != BluetoothAdapterState.on) {
         throw 'Bluetooth non disponible ou éteint';
       }
 
+      // Démarrer le scan et ATTENDRE sa fin (timeout inclus)
       await FlutterBluePlus.startScan(timeout: timeout);
+      await FlutterBluePlus.isScanning
+          .where((scanning) => scanning == false)
+          .first;
 
-      final results = FlutterBluePlus.lastScanResults;
+      // Dédupliquer par remoteId et retourner tous les appareils
       final seen = <String>{};
-      for (final result in results) {
-        final deviceName = result.device.platformName;
+      final results = <ScanResult>[];
+      for (final result in FlutterBluePlus.lastScanResults) {
         final id = result.device.remoteId.toString();
-        if ((deviceName.contains('RespiraBox') ||
-                deviceName.contains('respirabox')) &&
-            seen.add(id)) {
-          foundResults.add(result);
+        if (seen.add(id)) {
+          results.add(result);
         }
       }
-
-      await FlutterBluePlus.stopScan();
-      return foundResults;
+      return results;
     } catch (e) {
       await FlutterBluePlus.stopScan();
       throw 'Erreur lors du scan: $e';
@@ -249,26 +246,6 @@ class RespiraBoxDeviceService {
     }
   }
 
-  /// 📈 CALCULER LE NIVEAU DE RISQUE
-  String _calculateRiskLevel(Map<String, dynamic> data) {
-    final spo2 = data['SPO2'] ?? 95.0;
-    final hr = data['HR'] ?? 75;
-    final temp = data['TEMP'] ?? 36.5;
-
-    // RISQUE ÉLEVÉ: Hypoxie sévère ou anomalies multiples
-    if (spo2 < 90 || hr < 50 || hr > 120 || temp > 38.5) {
-      return 'high';
-    }
-
-    // RISQUE MOYEN: Anomalie modérée
-    if (spo2 < 95 || hr < 60 || hr > 100 || temp > 37.5) {
-      return 'medium';
-    }
-
-    // RISQUE FAIBLE: Toutes les valeurs normales
-    return 'low';
-  }
-
   /// 📈 CALCULER LE NIVEAU DE RISQUE (ENUM)
   RiskLevel _calculateRiskLevelEnum(Map<String, dynamic> data) {
     final spo2 = data['SPO2'] ?? 95.0;
@@ -320,30 +297,6 @@ class RespiraBoxDeviceService {
     }
 
     return score.clamp(0, 100);
-  }
-
-  /// 📝 GÉNÉRER LES RECOMMANDATIONS
-  List<String> _generateRecommendations(Map<String, dynamic> data) {
-    final recommendations = <String>[];
-    final riskLevel = _calculateRiskLevel(data);
-
-    if (riskLevel == 'high') {
-      recommendations.add('⚠️ Consulter rapidement un médecin');
-      recommendations.add('🚭 Éviter l\'exposition à la fumée');
-      recommendations.add('💊 Suivre strictement le traitement prescrit');
-    } else if (riskLevel == 'medium') {
-      recommendations
-          .add('👨‍⚕️ Consulter votre médecin lors du prochain rendez-vous');
-      recommendations.add('🏃‍♂️ Maintenir une activité physique régulière');
-      recommendations.add('🌬️ Pratiquer des exercices respiratoires');
-    } else {
-      recommendations
-          .add('✅ Résultats normaux, continuer les bonnes pratiques');
-      recommendations.add('🏃‍♂️ Maintenir une activité physique régulière');
-      recommendations.add('📅 Test de contrôle dans 3-6 mois');
-    }
-
-    return recommendations;
   }
 
   /// 🔄 METTRE À JOUR LE STATUT DU DEVICE

@@ -435,79 +435,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return months[month - 1];
   }
 
-  Widget _buildTestCard({
-    required String date,
-    required String time,
-    required String riskLevel,
-    required int spo2,
-    required int heartRate,
-    required Color riskColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: riskColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.favorite, color: riskColor, size: 24),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$date - $time',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'SpO2: $spo2% • FC: $heartRate bpm',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textLight,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: riskColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              riskLevel,
-              style: TextStyle(
-                color: riskColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   String _getRelativeTime(DateTime date) {
     final diff = DateTime.now().difference(date);
@@ -636,7 +564,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             final totalTests = tests.length;
             final avgSpo2 = tests.isEmpty
                 ? 0
-                : (tests.map((t) => t.spo2 ?? 0).reduce((a, b) => a + b) /
+                : (tests.map((t) => t.spo2).reduce((a, b) => a + b) /
                         tests.length)
                     .round();
 

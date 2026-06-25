@@ -33,7 +33,6 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
 
   // Statut synchronisation Arduino
   bool _fingerOnSensor = false;
-  bool _sensorReady = false;
   String _statusMessage = 'En attente du capteur...';
 
   // Accumulation des données pour la moyenne finale
@@ -73,7 +72,6 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
         // Mode démo : écouter le stream simulé
         setState(() {
           _fingerOnSensor = true;
-          _sensorReady = true;
           _statusMessage = 'Mode démonstration actif';
         });
         _demoSubscription = DemoDataService.simulateData().listen((data) {
@@ -265,7 +263,7 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
             switch (status) {
               case 'STATUS:FINGER_ON':
                 _fingerOnSensor = true;
-                _sensorReady = true;
+  
                 _statusMessage = 'Doigt détecté — mesure en cours';
                 break;
               case 'STATUS:FINGER_OFF':
@@ -273,11 +271,11 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
                 _statusMessage = 'Replacez le doigt sur le capteur';
                 break;
               case 'STATUS:READY':
-                _sensorReady = true;
+  
                 _statusMessage = 'Capteur prêt — posez le doigt';
                 break;
               case 'ERROR:SENSOR_NOT_READY':
-                _sensorReady = false;
+  
                 _statusMessage = 'Capteur non prêt — vérifiez le montage';
                 break;
               default:
