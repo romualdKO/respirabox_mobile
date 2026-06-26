@@ -33,7 +33,7 @@ class RespiraBoxDeviceService {
   /// État de connexion
   bool get isConnected => _connectedDevice != null;
 
-  /// 🔍 SCANNER TOUS LES DEVICES BLUETOOTH
+  /// 🔍 SCANNER UNIQUEMENT LES BOÎTIERS RESPIRABOX
   Future<List<ScanResult>> scanForDevices(
       {Duration timeout = const Duration(seconds: 15)}) async {
     try {
@@ -42,13 +42,16 @@ class RespiraBoxDeviceService {
         throw 'Bluetooth non disponible ou éteint';
       }
 
-      // Démarrer le scan et ATTENDRE sa fin (timeout inclus)
-      await FlutterBluePlus.startScan(timeout: timeout);
+      // Filtrer par nom de device — seul "RespiraBox-ESP32" apparaît
+      await FlutterBluePlus.startScan(
+        timeout: timeout,
+        withNames: ["RespiraBox-ESP32"],
+      );
       await FlutterBluePlus.isScanning
           .where((scanning) => scanning == false)
           .first;
 
-      // Dédupliquer par remoteId et retourner tous les appareils
+      // Dédupliquer par remoteId
       final seen = <String>{};
       final results = <ScanResult>[];
       for (final result in FlutterBluePlus.lastScanResults) {
@@ -136,7 +139,7 @@ class RespiraBoxDeviceService {
         return;
       }
 
-      // Format données : "HR:75,SPO2:98,TEMP:36.7"
+      // Format données : "HR:75,SPO2:98,TEMP:36.7,AQ:320"
       final Map<String, dynamic> parsedData = {};
       final parts = dataString.split(',');
       for (var part in parts) {
@@ -151,8 +154,9 @@ class RespiraBoxDeviceService {
       if (parsedData.isEmpty) return;
 
       if (!parsedData.containsKey('TEMP')) parsedData['TEMP'] = 0.0;
+      if (!parsedData.containsKey('AQ'))   parsedData['AQ']   = 0.0;
 
-      print('📊 ESP32 → HR=${parsedData['HR']}, SpO2=${parsedData['SPO2']}, T=${parsedData['TEMP']}°C');
+      print('📊 ESP32 → HR=${parsedData['HR']}, SpO2=${parsedData['SPO2']}, T=${parsedData['TEMP']}°C, AQ=${parsedData['AQ']}ppm');
 
       _dataStreamController.add(parsedData);
     } catch (e) {

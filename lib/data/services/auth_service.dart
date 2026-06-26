@@ -161,43 +161,35 @@ class AuthService {
   }
 
   /// 🔵 CONNEXION AVEC GOOGLE
-  Future<UserModel?> signInWithGoogle() async {
+  /// Retourne (user, isNewUser) — isNewUser=true si premier passage
+  Future<({UserModel? user, bool isNewUser})> signInWithGoogle() async {
     try {
-      // 1. Déclencher le flux d'authentification Google
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return (user: null, isNewUser: false);
 
-      if (googleUser == null) {
-        // L'utilisateur a annulé la connexion
-        return null;
-      }
-
-      // 2. Obtenir les détails d'authentification
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      // 3. Créer les credentials Firebase
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // 4. Se connecter à Firebase avec les credentials Google
       final UserCredential userCredential =
           await _auth.signInWithCredential(credential);
 
       if (userCredential.user != null) {
         final firebaseUser = userCredential.user!;
+        final isNew = userCredential.additionalUserInfo?.isNewUser ?? false;
 
-        // 5. Vérifier si l'utilisateur existe déjà dans Firestore
         final userDoc =
             await _firestore.collection('users').doc(firebaseUser.uid).get();
 
         if (userDoc.exists) {
-          // Utilisateur existant, récupérer ses données
-          return UserModel.fromFirestore(userDoc);
+          return (user: UserModel.fromFirestore(userDoc), isNewUser: false);
         }
 
-        // Nouvel utilisateur — créer et persister son profil
+        // Nouvel utilisateur — créer le profil Firestore
         final nameParts =
             (googleUser.displayName ?? firebaseUser.displayName ?? '')
                 .split(' ');
@@ -216,15 +208,14 @@ class AuthService {
           isActive: true,
         );
 
-        // Sauvegarder dans Firestore et ATTENDRE la confirmation
         await _firestore
             .collection('users')
             .doc(newUser.id)
             .set(newUser.toFirestore());
 
-        return newUser;
+        return (user: newUser, isNewUser: isNew || true);
       }
-      return null;
+      return (user: null, isNewUser: false);
     } on FirebaseAuthException catch (e) {
       throw _handleAuthException(e);
     } catch (e) {
