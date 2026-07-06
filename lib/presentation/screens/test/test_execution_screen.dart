@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
@@ -339,7 +340,7 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
                     ),
                   ],
                 ),
-              ),
+              ).animate().fadeIn(duration: 350.ms),
 
               const SizedBox(height: 16),
 
@@ -461,21 +462,21 @@ class _TestExecutionScreenState extends ConsumerState<TestExecutionScreen>
                     value: _spo2.round().toString(),
                     unit: '%',
                     color: AppColors.info,
-                  ),
+                  ).animate().fadeIn(delay: 100.ms, duration: 350.ms).slideY(begin: 0.15, end: 0),
                   _buildMetricCard(
                     icon: Icons.favorite,
                     label: 'Fréquence',
                     value: _heartRate.round().toString(),
                     unit: 'bpm',
                     color: AppColors.error,
-                  ),
+                  ).animate().fadeIn(delay: 170.ms, duration: 350.ms).slideY(begin: 0.15, end: 0),
                   _buildMetricCard(
                     icon: Icons.thermostat,
                     label: 'Température',
                     value: _temperature.toStringAsFixed(1),
                     unit: '°C',
                     color: AppColors.warning,
-                  ),
+                  ).animate().fadeIn(delay: 240.ms, duration: 350.ms).slideY(begin: 0.15, end: 0),
                 ],
               ),
               const SizedBox(height: 20),

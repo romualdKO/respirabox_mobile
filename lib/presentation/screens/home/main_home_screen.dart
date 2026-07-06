@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
@@ -36,7 +37,17 @@ class _MainHomeScreenState extends ConsumerState<MainHomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: userAsync.when(
-        data: (user) => _pages[_currentIndex],
+        data: (user) => AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: child,
+          ),
+          child: KeyedSubtree(
+            key: ValueKey(_currentIndex),
+            child: _pages[_currentIndex],
+          ),
+        ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, stack) => Center(
           child: Text('Erreur: $error'),
@@ -95,17 +106,32 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(context, userAsync.valueOrNull, userId),
+            _buildHeader(context, userAsync.valueOrNull, userId)
+                .animate()
+                .fadeIn(duration: 350.ms)
+                .slideY(begin: -0.1, end: 0),
             const SizedBox(height: 30),
-            _buildWelcomeCard(context, recentTests),
+            _buildWelcomeCard(context, recentTests)
+                .animate()
+                .fadeIn(delay: 100.ms, duration: 400.ms)
+                .slideY(begin: 0.08, end: 0),
             const SizedBox(height: 25),
-            Text('Actions rapides', style: AppTextStyles.h3),
+            Text('Actions rapides', style: AppTextStyles.h3)
+                .animate()
+                .fadeIn(delay: 200.ms, duration: 350.ms),
             const SizedBox(height: 15),
-            _buildQuickActions(context),
+            _buildQuickActions(context)
+                .animate()
+                .fadeIn(delay: 250.ms, duration: 400.ms)
+                .slideY(begin: 0.08, end: 0),
             const SizedBox(height: 30),
-            _buildLastTests(context, userId),
+            _buildLastTests(context, userId)
+                .animate()
+                .fadeIn(delay: 300.ms, duration: 400.ms),
             const SizedBox(height: 30),
-            _buildStatistics(context, userId),
+            _buildStatistics(context, userId)
+                .animate()
+                .fadeIn(delay: 350.ms, duration: 400.ms),
           ],
         ),
       ),
@@ -258,7 +284,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             onTap: () => Navigator.pushNamed(context, AppRoutes.deviceScan),
           ),
         ),
-        const SizedBox(width: 15),
+        const SizedBox(width: 12),
         Expanded(
           child: _buildActionCard(
             context,
@@ -267,6 +293,17 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             subtitle: 'Assistance IA',
             color: AppColors.secondary,
             onTap: () => Navigator.pushNamed(context, AppRoutes.chatbot),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildActionCard(
+            context,
+            icon: Icons.newspaper_outlined,
+            title: 'Éducation',
+            subtitle: 'Actualités',
+            color: AppColors.info,
+            onTap: () => Navigator.pushNamed(context, AppRoutes.educationFeed),
           ),
         ),
       ],
@@ -284,29 +321,38 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
+      splashColor: color.withOpacity(0.15),
+      highlightColor: color.withOpacity(0.08),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         decoration: BoxDecoration(
           color: color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: color.withOpacity(0.3)),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 10),
+            Icon(icon, size: 32, color: color),
+            const SizedBox(height: 8),
             Text(
               title,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: color,
-                fontSize: 16,
+                fontSize: 14,
               ),
             ),
             Text(
               subtitle,
-              style: TextStyle(
-                fontSize: 12,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11,
                 color: AppColors.textLight,
               ),
             ),

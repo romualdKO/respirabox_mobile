@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -8,6 +9,8 @@ import '../../../data/services/gemini_ai_service.dart';
 import '../../../data/services/assemblyai_service.dart';
 import '../../../data/services/conversation_service.dart';
 import '../../../data/services/patient_context_service.dart';
+import '../../../data/services/text_to_speech_service.dart';
+import '../../../data/services/research_data_service.dart';
 import '../../../data/models/conversation_model.dart';
 import '../../../data/providers/conversation_provider.dart';
 import '../../../core/providers/app_providers.dart';
@@ -31,6 +34,11 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
   ConversationModel? _currentConversation;
   final ConversationService _conversationService = ConversationService();
 
+  // 🔊 Réponse vocale : activée par défaut, lue automatiquement quand la
+  // question de l'utilisateur venait elle-même du micro.
+  final TextToSpeechService _ttsService = TextToSpeechService();
+  bool _voiceReplyEnabled = true;
+
   // 🎤 Enregistrement vocal avec flutter_sound
   final FlutterSoundRecorder _audioRecorder = FlutterSoundRecorder();
   bool _isRecording = false;
@@ -51,6 +59,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     _messageController.dispose();
     _scrollController.dispose();
     _audioRecorder.closeRecorder();
+    _ttsService.stop();
     super.dispose();
   }
 
@@ -228,7 +237,7 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
     }
   }
 
-  Future<void> _sendMessage(String text) async {
+  Future<void> _sendMessage(String text, {bool isVoiceInput = false}) async {
     if (text.trim().isEmpty) return;
 
     final userMessage = ChatMessage(
@@ -335,6 +344,11 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
           text: botMessage.text,
           isUser: false,
         );
+      }
+
+      // 🔊 Réponse vocale automatique uniquement si la question venait du micro
+      if (isVoiceInput && _voiceReplyEnabled) {
+        _ttsService.speak(botResponse);
       }
 
       _scrollToBottom();
@@ -668,8 +682,8 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
       });
 
       if (transcription.isNotEmpty) {
-        // Envoyer le texte transcrit comme message
-        await _sendMessage(transcription);
+        // Envoyer le texte transcrit comme message — réponse vocale automatique
+        await _sendMessage(transcription, isVoiceInput: true);
       } else {
         setState(() {
           _messages.add(ChatMessage(
@@ -721,6 +735,19 @@ class _ChatbotScreenState extends ConsumerState<ChatbotScreen> {
         audioPath,
         patientContext: patientContext.isEmpty ? null : patientContext,
       );
+
+      // 🔬 Contribution recherche (opt-in) — non bloquant, en arrière-plan
+      if (analysis['hasCough'] == true && analysis['isReliable'] != false) {
+        final user = await _getUser();
+        if (user != null) {
+          ResearchDataService.submitIfConsented(
+            userId: user.id,
+            consented: user.allowResearchDataSharing,
+            audioFilePath: audioPath,
+            analysisResult: analysis,
+          );
+        }
+      }
 
       // Retirer le message de chargement
       setState(() {
@@ -924,6 +951,19 @@ $reason
           ),
           actions: [
             IconButton(
+              icon: Icon(
+                _voiceReplyEnabled ? Icons.volume_up : Icons.volume_off,
+                color: Colors.white,
+              ),
+              tooltip: _voiceReplyEnabled
+                  ? 'Désactiver la réponse vocale'
+                  : 'Activer la réponse vocale',
+              onPressed: () {
+                setState(() => _voiceReplyEnabled = !_voiceReplyEnabled);
+                if (!_voiceReplyEnabled) _ttsService.stop();
+              },
+            ),
+            IconButton(
               icon: const Icon(Icons.add, color: Colors.white),
               tooltip: 'Nouvelle conversation',
               onPressed: _createNewConversation,
@@ -1093,7 +1133,10 @@ $reason
           ],
         ],
       ),
-    );
+    )
+        .animate()
+        .fadeIn(duration: 250.ms)
+        .slideX(begin: message.isUser ? 0.1 : -0.1, end: 0, curve: Curves.easeOut);
   }
 
   Widget _buildTypingDot(int index) {
@@ -1157,7 +1200,12 @@ $reason
                   ? 'Arrêter transcription'
                   : 'Message vocal (texte)',
             ),
-          ),
+          )
+              .animate(
+                target: _isRecordingForTranscription ? 1 : 0,
+                onPlay: (c) => _isRecordingForTranscription ? c.repeat(reverse: true) : null,
+              )
+              .scaleXY(begin: 1, end: 1.15, duration: 500.ms, curve: Curves.easeInOut),
           const SizedBox(width: 6),
 
           // 🩺 NOUVEAU: Bouton ANALYSE TOUX - ROUGE
@@ -1179,7 +1227,12 @@ $reason
                   ? 'Arrêter analyse'
                   : 'Analyser ma toux',
             ),
-          ),
+          )
+              .animate(
+                target: _isRecordingForCough ? 1 : 0,
+                onPlay: (c) => _isRecordingForCough ? c.repeat(reverse: true) : null,
+              )
+              .scaleXY(begin: 1, end: 1.15, duration: 500.ms, curve: Curves.easeInOut),
           const SizedBox(width: 8),
 
           Expanded(

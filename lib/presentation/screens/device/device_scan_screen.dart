@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -304,16 +305,32 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
 
   Widget _buildScanAnimation() {
     return Center(
-      child: Container(
+      child: SizedBox(
         width: 200,
         height: 200,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: AppColors.primary.withOpacity(0.1),
-        ),
         child: Stack(
           alignment: Alignment.center,
           children: [
+            if (_isScanning)
+              Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary.withOpacity(0.15),
+                ),
+              )
+                  .animate(onPlay: (c) => c.repeat())
+                  .scaleXY(begin: 0.5, end: 1, duration: 1600.ms, curve: Curves.easeOut)
+                  .fadeOut(duration: 1600.ms, curve: Curves.easeOut),
+            Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withOpacity(0.1),
+              ),
+            ),
             Container(
               width: 120,
               height: 120,
@@ -326,7 +343,9 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
                 size: 60,
                 color: AppColors.primary,
               ),
-            ),
+            )
+                .animate(target: _isScanning ? 1 : 0)
+                .scaleXY(begin: 1, end: 1.06, duration: 700.ms, curve: Curves.easeInOut),
           ],
         ),
       ),
@@ -403,7 +422,10 @@ class _DeviceScanScreenState extends ConsumerState<DeviceScanScreen> {
         return _DeviceCard(
           result: result,
           onConnect: () => _connectToDevice(result),
-        );
+        )
+            .animate()
+            .fadeIn(delay: (60 * index).ms, duration: 350.ms)
+            .slideX(begin: 0.1, end: 0);
       },
     );
   }

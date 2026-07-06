@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
+import '../../widgets/common/common.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -45,52 +47,54 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Skip button
-            Align(
-              alignment: Alignment.topRight,
-              child: TextButton(
-                onPressed: () => _navigateToWelcome(),
-                child: Text(
-                  'Passer',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.primary,
+      body: AppBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Skip button
+              Align(
+                alignment: Alignment.topRight,
+                child: TextButton(
+                  onPressed: () => _navigateToWelcome(),
+                  child: Text(
+                    'Passer',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
               ),
-            ),
-            // Page view
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _pages.length,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                itemBuilder: (context, index) {
-                  return _buildPage(_pages[index]);
-                },
+              // Page view
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _pages.length,
+                  onPageChanged: (index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    return _buildPage(_pages[index], index);
+                  },
+                ),
               ),
-            ),
-            // Dots indicator
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _pages.length,
-                (index) => _buildDot(index),
+              // Dots indicator
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  _pages.length,
+                  (index) => _buildDot(index),
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            // Next/Done button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
+              const SizedBox(height: 32),
+              // Next/Done button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: AppPrimaryButton(
+                  label: _currentPage == _pages.length - 1
+                      ? 'Commencer'
+                      : 'Suivant',
                   onPressed: () {
                     if (_currentPage == _pages.length - 1) {
                       _navigateToWelcome();
@@ -101,22 +105,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       );
                     }
                   },
-                  child: Text(
-                    _currentPage == _pages.length - 1
-                        ? 'Commencer'
-                        : 'Suivant',
-                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 32),
-          ],
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildPage(OnboardingPage page) {
+  Widget _buildPage(OnboardingPage page, int index) {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -127,7 +126,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withOpacity(0.15),
+                  AppColors.secondary.withOpacity(0.15),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -135,14 +141,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               size: 60,
               color: AppColors.primary,
             ),
-          ),
+          ).animate(key: ValueKey(index)).fadeIn(duration: 400.ms).scale(
+              begin: const Offset(0.7, 0.7), curve: Curves.easeOutBack, duration: 500.ms),
           const SizedBox(height: 48),
           // Title
           Text(
             page.title,
             style: AppTextStyles.headline2,
             textAlign: TextAlign.center,
-          ),
+          )
+              .animate(key: ValueKey('title_$index'))
+              .fadeIn(delay: 150.ms, duration: 400.ms)
+              .slideY(begin: 0.2, end: 0),
           const SizedBox(height: 16),
           // Description
           Text(
@@ -151,7 +161,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               color: AppColors.textSecondary,
             ),
             textAlign: TextAlign.center,
-          ),
+          )
+              .animate(key: ValueKey('desc_$index'))
+              .fadeIn(delay: 250.ms, duration: 400.ms)
+              .slideY(begin: 0.2, end: 0),
         ],
       ),
     );

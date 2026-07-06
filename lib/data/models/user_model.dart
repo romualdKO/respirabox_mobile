@@ -23,6 +23,10 @@ class UserModel {
   final String? medications; // Médicaments actuels
   final String? emergencyContact; // Contact d'urgence
 
+  // 🔬 Consentement recherche (opt-in, voir feature "collecte de données")
+  final bool allowResearchDataSharing; // Partage anonymisé pour améliorer le modèle ML
+  final DateTime? researchConsentDate;
+
   UserModel({
     required this.id,
     required this.firstName,
@@ -43,6 +47,8 @@ class UserModel {
     this.allergies,
     this.medications,
     this.emergencyContact,
+    this.allowResearchDataSharing = false,
+    this.researchConsentDate,
   });
 
   /// Nom complet de l'utilisateur
@@ -87,6 +93,10 @@ class UserModel {
       allergies: json['allergies'],
       medications: json['medications'],
       emergencyContact: json['emergencyContact'],
+      allowResearchDataSharing: json['allowResearchDataSharing'] ?? false,
+      researchConsentDate: json['researchConsentDate'] != null
+          ? DateTime.parse(json['researchConsentDate'])
+          : null,
     );
   }
 
@@ -112,6 +122,8 @@ class UserModel {
       'allergies': allergies,
       'medications': medications,
       'emergencyContact': emergencyContact,
+      'allowResearchDataSharing': allowResearchDataSharing,
+      'researchConsentDate': researchConsentDate?.toIso8601String(),
     };
   }
 
@@ -147,6 +159,10 @@ class UserModel {
       allergies: data['allergies'],
       medications: data['medications'],
       emergencyContact: data['emergencyContact'],
+      allowResearchDataSharing: data['allowResearchDataSharing'] ?? false,
+      researchConsentDate: data['researchConsentDate'] != null
+          ? DateTime.parse(data['researchConsentDate'])
+          : null,
     );
   }
 
@@ -171,6 +187,8 @@ class UserModel {
       'allergies': allergies,
       'medications': medications,
       'emergencyContact': emergencyContact,
+      'allowResearchDataSharing': allowResearchDataSharing,
+      'researchConsentDate': researchConsentDate?.toIso8601String(),
     };
   }
 
@@ -195,6 +213,8 @@ class UserModel {
     String? allergies,
     String? medications,
     String? emergencyContact,
+    bool? allowResearchDataSharing,
+    DateTime? researchConsentDate,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -216,6 +236,9 @@ class UserModel {
       allergies: allergies ?? this.allergies,
       medications: medications ?? this.medications,
       emergencyContact: emergencyContact ?? this.emergencyContact,
+      allowResearchDataSharing:
+          allowResearchDataSharing ?? this.allowResearchDataSharing,
+      researchConsentDate: researchConsentDate ?? this.researchConsentDate,
     );
   }
 }

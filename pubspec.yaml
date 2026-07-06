@@ -33,6 +33,7 @@ dependencies:
   google_fonts: ^6.1.0
   flutter_svg: ^2.0.9
   lottie: ^2.7.0
+  flutter_animate: ^4.5.0
   
   # 📶 Bluetooth/Wi-Fi
   flutter_blue_plus: ^1.14.4
@@ -68,9 +69,24 @@ dependencies:
   # 🎵 Audio Analysis (FFT, MFCC, Spectral features)
   fftea: ^1.0.0
   scidart: ^0.0.2-dev.7
+
+  # 🤖 Modèle ML embarqué (détecteur crackles/sibilants entraîné sur ICBHI 2017)
+  tflite_flutter: ^0.12.1
+
+  # 🔊 Synthèse vocale (réponses parlées du chatbot)
+  flutter_tts: ^4.2.0
+
+  # 🗺️ Ouverture d'itinéraire vers un centre de santé (Google/Apple Maps)
+  url_launcher: ^6.3.1
   
   #  Storage
   firebase_storage: ^12.4.10
+
+  # 🔒 Pseudonymisation des identifiants (partage recherche)
+  crypto: ^3.0.3
+
+  # 📰 Parsing du flux RSS éducation santé (synchronisation côté app)
+  xml: ^6.5.0
   
   # �🛠️ Utilitaires
   intl: ^0.20.2
@@ -97,4 +113,5 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/animations/
+    - assets/models/
     - .env

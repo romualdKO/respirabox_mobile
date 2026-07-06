@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/colors.dart';
@@ -113,7 +114,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             const SizedBox(height: 10),
 
             // Statistiques résumées
-            _buildStatsSummary(tests),
+            _buildStatsSummary(tests)
+                .animate()
+                .fadeIn(delay: 100.ms, duration: 350.ms)
+                .slideY(begin: 0.08, end: 0),
             const SizedBox(height: 16),
 
             // Graphique de tendances
@@ -121,7 +125,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: TrendChartWidget(tests: allTests),
-              ),
+              ).animate().fadeIn(delay: 200.ms, duration: 350.ms),
             const SizedBox(height: 16),
 
             // Liste des tests
@@ -133,7 +137,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                       itemCount: tests.length,
                       itemBuilder: (context, index) {
                         final test = tests[index];
-                        return _buildTestCardFromModel(test);
+                        return _buildTestCardFromModel(test)
+                            .animate()
+                            .fadeIn(delay: (40 * index).ms, duration: 300.ms)
+                            .slideY(begin: 0.06, end: 0);
                       },
                     ),
             ),
@@ -586,7 +593,8 @@ Dépistage des maladies respiratoires
             Icons.science_outlined,
             size: 100,
             color: AppColors.primary.withOpacity(0.3),
-          ),
+          ).animate().fadeIn(duration: 400.ms).scale(
+              begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack, duration: 500.ms),
           const SizedBox(height: 20),
           Text(
             _selectedFilter == 'Tous'

@@ -73,3 +73,10 @@ macos/Flutter/GeneratedPluginRegistrant.swift
 init_git.ps1
 DEPLOY_GITHUB.md
 GUIDE_GITHUB.md
+
+# Pipeline ML — données brutes/prétraitées régénérables (voir ml/README.md),
+# le modèle entraîné final (assets/models/*.tflite) reste versionné
+ml/data/
+ml/ml_env/
+ml/dart_validation/.dart_tool/
+ml/dart_validation/pubspec.lock

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/colors.dart';
@@ -8,6 +9,7 @@ import '../../../data/models/test_result_model.dart';
 import '../../../data/services/patient_context_service.dart';
 import '../../../data/services/pdf_export_service.dart';
 import '../../widgets/disease_risk_comparison_chart.dart';
+import '../../widgets/common/common.dart';
 
 /// 📊 ÉCRAN DES RÉSULTATS DU TEST
 /// Affiche les résultats détaillés et les recommandations
@@ -69,38 +71,62 @@ class TestResultsScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Score de risque
-              _buildRiskScoreCard(riskLevel, riskScore, riskColor),
+              _buildRiskScoreCard(riskLevel, riskScore, riskColor)
+                  .animate()
+                  .fadeIn(duration: 400.ms)
+                  .scale(begin: const Offset(0.95, 0.95), curve: Curves.easeOut, duration: 450.ms),
               const SizedBox(height: 25),
 
               // Métriques principales
-              Text('Vos mesures', style: AppTextStyles.h3),
+              Text('Vos mesures', style: AppTextStyles.h3)
+                  .animate()
+                  .fadeIn(delay: 150.ms, duration: 350.ms),
               const SizedBox(height: 15),
-              _buildMetricsGrid(spo2, heartRate, temperature),
+              _buildMetricsGrid(spo2, heartRate, temperature)
+                  .animate()
+                  .fadeIn(delay: 200.ms, duration: 350.ms)
+                  .slideY(begin: 0.08, end: 0),
               const SizedBox(height: 30),
 
               // Interprétation
-              Text('Interprétation', style: AppTextStyles.h3),
+              Text('Interprétation', style: AppTextStyles.h3)
+                  .animate()
+                  .fadeIn(delay: 250.ms, duration: 350.ms),
               const SizedBox(height: 15),
-              _buildInterpretationCard(riskLevel, spo2, riskColor),
+              _buildInterpretationCard(riskLevel, spo2, riskColor)
+                  .animate()
+                  .fadeIn(delay: 300.ms, duration: 350.ms)
+                  .slideY(begin: 0.08, end: 0),
               const SizedBox(height: 30),
 
               // Recommandations
-              Text('Recommandations', style: AppTextStyles.h3),
+              Text('Recommandations', style: AppTextStyles.h3)
+                  .animate()
+                  .fadeIn(delay: 350.ms, duration: 350.ms),
               const SizedBox(height: 15),
-              _buildRecommendations(riskLevel),
+              _buildRecommendations(riskLevel)
+                  .animate()
+                  .fadeIn(delay: 400.ms, duration: 350.ms)
+                  .slideY(begin: 0.08, end: 0),
               const SizedBox(height: 30),
 
               // 🆕 PRÉDICTION AUTOMATIQUE TB/PNEUMONIE (basée sur mesures vitales)
               _buildDiseaseRiskPrediction(
-                  context, spo2, heartRate, temperature),
+                      context, spo2, heartRate, temperature)
+                  .animate()
+                  .fadeIn(delay: 450.ms, duration: 400.ms),
               const SizedBox(height: 30),
 
               // 🆕 ANALYSE TOUX APPROFONDIE (optionnelle)
-              _buildCoughAnalysisCard(context, spo2, heartRate, temperature),
+              _buildCoughAnalysisCard(context, spo2, heartRate, temperature)
+                  .animate()
+                  .fadeIn(delay: 500.ms, duration: 400.ms),
               const SizedBox(height: 30),
 
               // Actions
-              _buildActionButtons(context),
+              _buildActionButtons(context)
+                  .animate()
+                  .fadeIn(delay: 550.ms, duration: 350.ms),
             ],
           ),
         ),
@@ -887,26 +913,16 @@ class TestResultsScreen extends StatelessWidget {
   Widget _buildActionButtons(BuildContext context) {
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.home,
-                (route) => false,
-              );
-            },
-            icon: const Icon(Icons.home),
-            label: const Text('Retour à l\'accueil'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
+        AppPrimaryButton(
+          label: 'Retour à l\'accueil',
+          icon: Icons.home,
+          onPressed: () {
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              AppRoutes.home,
+              (route) => false,
+            );
+          },
         ),
         const SizedBox(height: 12),
         SizedBox(

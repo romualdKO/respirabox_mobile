@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
 import '../../../data/services/auth_service.dart';
+import '../../widgets/common/common.dart';
 
 /// 🔑 ÉCRAN MOT DE PASSE OUBLIÉ
 /// Permet à l'utilisateur de réinitialiser son mot de passe
@@ -62,7 +64,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -71,7 +72,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
+      body: AppBackground(
+        child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Form(
@@ -84,14 +86,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 Text(
                   'Mot de passe oublié ?',
                   style: AppTextStyles.headline1,
-                ),
+                ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, end: 0),
                 const SizedBox(height: 16),
                 Text(
                   'Saisissez votre e-mail pour recevoir les instructions de réinitialisation.',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textSecondary,
                   ),
-                ),
+                ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
                 const SizedBox(height: 48),
 
                 if (!_emailSent) ...[
@@ -157,28 +159,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           ),
                         ],
                       ),
-                    ),
+                    ).animate().shake(duration: 400.ms, hz: 4).fadeIn(duration: 200.ms),
 
                   // Bouton Envoyer
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleSendInstructions,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                              'Envoyer les instructions',
-                              style: AppTextStyles.button
-                                  .copyWith(color: Colors.white),
-                            ),
-                    ),
+                  AppPrimaryButton(
+                    label: 'Envoyer les instructions',
+                    isLoading: _isLoading,
+                    onPressed: _isLoading ? null : _handleSendInstructions,
                   ),
                   const SizedBox(height: 24),
 
@@ -228,36 +215,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                       ],
                     ),
-                  ),
+                  ).animate().fadeIn(duration: 400.ms).scale(
+                      begin: const Offset(0.9, 0.9), curve: Curves.easeOutBack, duration: 500.ms),
                   const SizedBox(height: 32),
 
                   // Bouton retour connexion
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pushNamedAndRemoveUntil(
-                        context,
-                        AppRoutes.login,
-                        (route) => false,
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: Text(
-                        'Retour à la connexion',
-                        style:
-                            AppTextStyles.button.copyWith(color: Colors.white),
-                      ),
+                  AppPrimaryButton(
+                    label: 'Retour à la connexion',
+                    onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      AppRoutes.login,
+                      (route) => false,
                     ),
                   ),
                 ],
               ],
             ),
           ),
+        ),
         ),
       ),
     );

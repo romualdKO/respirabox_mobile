@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
@@ -94,7 +95,13 @@ class NotificationsScreen extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.notifications_none_outlined,
-                              size: 80, color: Colors.grey[300]),
+                                  size: 80, color: Colors.grey[300])
+                              .animate()
+                              .fadeIn(duration: 400.ms)
+                              .scale(
+                                  begin: const Offset(0.8, 0.8),
+                                  curve: Curves.easeOutBack,
+                                  duration: 500.ms),
                           const SizedBox(height: 16),
                           Text('Aucune notification',
                               style: AppTextStyles.h3
@@ -190,7 +197,10 @@ class NotificationsScreen extends ConsumerWidget {
                               },
                             ),
                           ),
-                        );
+                        )
+                            .animate(key: ValueKey(notif.id))
+                            .fadeIn(delay: (40 * index).ms, duration: 300.ms)
+                            .slideX(begin: 0.06, end: 0);
                       },
                     ),
             );

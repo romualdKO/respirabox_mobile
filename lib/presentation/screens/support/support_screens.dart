@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 
@@ -52,7 +53,7 @@ class ContentPage extends StatelessWidget {
                 ),
               ],
             ),
-          );
+          ).animate().fadeIn(delay: (60 * index).ms, duration: 300.ms).slideY(begin: 0.06, end: 0);
         },
       ),
     );
@@ -310,7 +311,8 @@ class AboutScreen extends StatelessWidget {
                       size: 50,
                       color: AppColors.primary,
                     ),
-                  ),
+                  ).animate().fadeIn(duration: 400.ms).scale(
+                      begin: const Offset(0.7, 0.7), curve: Curves.easeOutBack, duration: 500.ms),
                   const SizedBox(height: 20),
                   Text('RespiraBox', style: AppTextStyles.h1),
                   const SizedBox(height: 8),
@@ -337,7 +339,7 @@ class AboutScreen extends StatelessWidget {
               title: 'Notre mission',
               content:
                   'Rendre le dépistage des maladies respiratoires accessible à tous en Côte d\'Ivoire grâce à une technologie innovante et abordable.',
-            ),
+            ).animate().fadeIn(delay: 150.ms, duration: 350.ms).slideY(begin: 0.08, end: 0),
             const SizedBox(height: 16),
 
             // Équipe
@@ -346,7 +348,7 @@ class AboutScreen extends StatelessWidget {
               title: 'L\'équipe',
               content:
                   'RespiraBox est développé par une équipe passionnée de médecins, ingénieurs et designers basée à Abidjan.',
-            ),
+            ).animate().fadeIn(delay: 220.ms, duration: 350.ms).slideY(begin: 0.08, end: 0),
             const SizedBox(height: 16),
 
             // Contact
@@ -357,7 +359,7 @@ class AboutScreen extends StatelessWidget {
                   '📞 +225 05 59 01 90 43\n'
                   '🌐 www.respirabox.ci\n'
                   '📍 Abidjan, Côte d\'Ivoire',
-            ),
+            ).animate().fadeIn(delay: 290.ms, duration: 350.ms).slideY(begin: 0.08, end: 0),
             const SizedBox(height: 24),
 
             // Crédits

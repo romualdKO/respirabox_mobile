@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
+import '../../../routes/app_routes.dart';
 import '../../widgets/disease_risk_comparison_chart.dart';
 
 /// 🩺 ÉCRAN RÉSULTATS ANALYSE TOUX
@@ -38,6 +41,7 @@ class CoughAnalysisResultsScreen extends StatelessWidget {
     final recommendation = args['recommendation'] as String? ?? '';
     final actions = (args['actions'] as List?)?.cast<String>() ?? [];
     final wetnessProbability = args['wetnessProbability'] as double? ?? 0.0;
+    final isReliable = args['isReliable'] as bool? ?? true;
 
     final urgencyColor = _getUrgencyColor(urgencyLevel);
     final urgencyLabel = _getUrgencyLabel(urgencyLevel);
@@ -71,53 +75,86 @@ class CoughAnalysisResultsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ⚠️ FIABILITÉ AUDIO (si l'enregistrement n'a pas pu être analysé)
+              if (!isReliable) ...[
+                _buildReliabilityWarning().animate().shake(duration: 400.ms, hz: 4).fadeIn(duration: 200.ms),
+                const SizedBox(height: 16),
+              ],
+
               // 🚨 NIVEAU D'URGENCE
-              _buildUrgencyBanner(urgencyLabel, urgencyColor),
+              _buildUrgencyBanner(urgencyLabel, urgencyColor)
+                  .animate()
+                  .fadeIn(duration: 400.ms)
+                  .slideY(begin: 0.1, end: 0),
               const SizedBox(height: 24),
 
               // 📊 GRAPHIQUE COMPARAISON MALADIES
               DiseaseRiskComparisonChart(
                 coughAnalysis: args,
                 height: 280,
-              ),
+              ).animate().fadeIn(delay: 100.ms, duration: 400.ms),
               const SizedBox(height: 24),
 
               // 🎯 CARACTÉRISTIQUES TOUX
-              Text('Caractéristiques de la Toux', style: AppTextStyles.h3),
+              Text('Caractéristiques de la Toux', style: AppTextStyles.h3)
+                  .animate()
+                  .fadeIn(delay: 180.ms, duration: 350.ms),
               const SizedBox(height: 12),
               _buildCoughCharacteristics(
-                  coughType, intensity, wetnessProbability),
+                      coughType, intensity, wetnessProbability)
+                  .animate()
+                  .fadeIn(delay: 220.ms, duration: 350.ms)
+                  .slideY(begin: 0.08, end: 0),
               const SizedBox(height: 24),
 
               // 🎵 FEATURES ACOUSTIQUES (si disponibles)
               if (args['acousticFeatures'] != null) ...[
-                Text('Analyse Acoustique', style: AppTextStyles.h3),
+                Text('Analyse Acoustique', style: AppTextStyles.h3)
+                    .animate()
+                    .fadeIn(delay: 260.ms, duration: 350.ms),
                 const SizedBox(height: 12),
                 _buildAcousticFeatures(
-                    args['acousticFeatures'] as Map<String, dynamic>),
+                        args['acousticFeatures'] as Map<String, dynamic>)
+                    .animate()
+                    .fadeIn(delay: 300.ms, duration: 350.ms)
+                    .slideY(begin: 0.08, end: 0),
                 const SizedBox(height: 24),
               ],
 
               // 💡 RECOMMANDATIONS
-              Text('Recommandations', style: AppTextStyles.h3),
+              Text('Recommandations', style: AppTextStyles.h3)
+                  .animate()
+                  .fadeIn(delay: 340.ms, duration: 350.ms),
               const SizedBox(height: 12),
-              _buildRecommendationCard(recommendation, urgencyColor),
+              _buildRecommendationCard(recommendation, urgencyColor)
+                  .animate()
+                  .fadeIn(delay: 380.ms, duration: 350.ms)
+                  .slideY(begin: 0.08, end: 0),
               const SizedBox(height: 16),
 
               // ✅ ACTIONS SUGGÉRÉES
               if (actions.isNotEmpty) ...[
-                Text('Actions à Entreprendre', style: AppTextStyles.h3),
+                Text('Actions à Entreprendre', style: AppTextStyles.h3)
+                    .animate()
+                    .fadeIn(delay: 420.ms, duration: 350.ms),
                 const SizedBox(height: 12),
-                _buildActionsList(actions, urgencyLevel),
+                _buildActionsList(actions, urgencyLevel)
+                    .animate()
+                    .fadeIn(delay: 460.ms, duration: 350.ms)
+                    .slideY(begin: 0.08, end: 0),
                 const SizedBox(height: 24),
               ],
 
               // 🚨 AVERTISSEMENT MÉDICAL
-              _buildMedicalDisclaimer(),
+              _buildMedicalDisclaimer()
+                  .animate()
+                  .fadeIn(delay: 500.ms, duration: 350.ms),
               const SizedBox(height: 30),
 
               // 🔘 BOUTONS ACTIONS
-              _buildActionButtons(context, urgencyLevel),
+              _buildActionButtons(context, urgencyLevel)
+                  .animate()
+                  .fadeIn(delay: 540.ms, duration: 350.ms),
             ],
           ),
         ),
@@ -363,6 +400,36 @@ class CoughAnalysisResultsScreen extends StatelessWidget {
     );
   }
 
+  /// ⚠️ AVERTISSEMENT FIABILITÉ AUDIO
+  ///
+  /// Affiché quand l'enregistrement n'a pas pu être analysé correctement
+  /// (fichier vide/corrompu) et que les scores ci-dessous reposent sur des
+  /// valeurs par défaut plutôt qu'une vraie analyse acoustique.
+  Widget _buildReliabilityWarning() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        border: Border.all(color: Colors.red.shade300, width: 1.5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: Colors.red.shade700, size: 22),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Enregistrement audio non exploitable. Les résultats '
+              'ci-dessous ne sont PAS fiables — veuillez refaire le test '
+              'dans un environnement calme, micro proche de la bouche.',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// ⚠️ DISCLAIMER MÉDICAL
   Widget _buildMedicalDisclaimer() {
     return Container(
@@ -392,23 +459,13 @@ class CoughAnalysisResultsScreen extends StatelessWidget {
   Widget _buildActionButtons(BuildContext context, String urgency) {
     return Column(
       children: [
-        if (urgency == 'urgent' || urgency == 'high')
+        if (urgency == 'urgent')
           ElevatedButton.icon(
-            onPressed: () {
-              // TODO: Naviguer vers prise de rendez-vous ou appel urgence
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Fonction à implémenter: Appel urgence')),
-              );
-            },
+            onPressed: () => launchUrl(Uri(scheme: 'tel', path: '185')),
             icon: const Icon(Icons.phone),
-            label: Text(
-              urgency == 'urgent'
-                  ? 'Appeler SAMU (185)'
-                  : 'Prendre Rendez-vous',
-            ),
+            label: const Text('Appeler SAMU (185)'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: urgency == 'urgent' ? Colors.red : Colors.orange,
+              backgroundColor: Colors.red,
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 50),
               shape: RoundedRectangleBorder(
@@ -416,6 +473,25 @@ class CoughAnalysisResultsScreen extends StatelessWidget {
               ),
             ),
           ),
+        if (urgency == 'urgent' || urgency == 'high') ...[
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pushNamed(
+              context,
+              AppRoutes.nearbyHealthCenters,
+            ),
+            icon: const Icon(Icons.local_hospital),
+            label: const Text('Centres de santé à proximité'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: () => Navigator.pop(context),
@@ -475,7 +551,10 @@ class CoughAnalysisResultsScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.check_circle, size: 80, color: Colors.green.shade400),
+              Icon(Icons.check_circle, size: 80, color: Colors.green.shade400)
+                  .animate()
+                  .fadeIn(duration: 400.ms)
+                  .scale(begin: const Offset(0.7, 0.7), curve: Curves.easeOutBack, duration: 500.ms),
               const SizedBox(height: 20),
               const Text(
                 'Aucune toux détectée',

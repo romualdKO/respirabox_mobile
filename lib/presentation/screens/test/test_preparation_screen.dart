@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
+import '../../widgets/common/common.dart';
 
 /// 📋 ÉCRAN DE PRÉPARATION AU TEST RESPIRATOIRE
 /// Instructions avant de commencer le test
@@ -45,21 +47,22 @@ class TestPreparationScreen extends StatelessWidget {
                           color: AppColors.primary,
                         ),
                       ),
-                    ),
+                    ).animate().fadeIn(duration: 400.ms).scale(
+                        begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack, duration: 500.ms),
                     const SizedBox(height: 30),
 
                     // Titre
                     Text(
                       'Avant de commencer',
                       style: AppTextStyles.h2,
-                    ),
+                    ).animate().fadeIn(delay: 150.ms, duration: 350.ms),
                     const SizedBox(height: 10),
                     Text(
                       'Suivez ces instructions pour un test précis',
                       style: AppTextStyles.bodyText.copyWith(
                         color: AppColors.textLight,
                       ),
-                    ),
+                    ).animate().fadeIn(delay: 200.ms, duration: 350.ms),
                     const SizedBox(height: 30),
 
                     // Instructions
@@ -70,7 +73,7 @@ class TestPreparationScreen extends StatelessWidget {
                           'Asseyez-vous confortablement, le dos droit et détendu',
                       icon: Icons.chair_outlined,
                       color: AppColors.primary,
-                    ),
+                    ).animate().fadeIn(delay: 250.ms, duration: 350.ms).slideX(begin: 0.08, end: 0),
                     const SizedBox(height: 15),
 
                     _buildInstructionCard(
@@ -80,7 +83,7 @@ class TestPreparationScreen extends StatelessWidget {
                           'Respirez normalement pendant 2-3 minutes avant le test',
                       icon: Icons.air_outlined,
                       color: AppColors.info,
-                    ),
+                    ).animate().fadeIn(delay: 320.ms, duration: 350.ms).slideX(begin: 0.08, end: 0),
                     const SizedBox(height: 15),
 
                     _buildInstructionCard(
@@ -90,7 +93,7 @@ class TestPreparationScreen extends StatelessWidget {
                           'Placez correctement le capteur d\'oxymétrie sur votre index',
                       icon: Icons.fingerprint_outlined,
                       color: AppColors.secondary,
-                    ),
+                    ).animate().fadeIn(delay: 390.ms, duration: 350.ms).slideX(begin: 0.08, end: 0),
                     const SizedBox(height: 15),
 
                     _buildInstructionCard(
@@ -100,7 +103,7 @@ class TestPreparationScreen extends StatelessWidget {
                           'Restez immobile pendant toute la durée du test (30 secondes)',
                       icon: Icons.do_not_disturb_alt_outlined,
                       color: AppColors.warning,
-                    ),
+                    ).animate().fadeIn(delay: 460.ms, duration: 350.ms).slideX(begin: 0.08, end: 0),
                     const SizedBox(height: 30),
 
                     // Avertissement
@@ -132,7 +135,7 @@ class TestPreparationScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ),
+                    ).animate().fadeIn(delay: 530.ms, duration: 350.ms),
                   ],
                 ),
               ),
@@ -153,28 +156,11 @@ class TestPreparationScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, AppRoutes.testExecution);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Commencer le test',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                  AppPrimaryButton(
+                    label: 'Commencer le test',
+                    onPressed: () {
+                      Navigator.pushNamed(context, AppRoutes.testExecution);
+                    },
                   ),
                   const SizedBox(height: 10),
                   TextButton(

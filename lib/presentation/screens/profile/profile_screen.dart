@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -119,12 +120,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Column(
         children: [
           // En-tête avec photo de profil
-          _buildProfileHeader(),
+          _buildProfileHeader().animate().fadeIn(duration: 400.ms).slideY(begin: -0.05, end: 0),
           const SizedBox(height: 20),
 
           // Informations personnelles
           _buildSection(
             title: 'Informations personnelles',
+            delayMs: 100,
             children: [
               _buildInfoTile(
                 icon: Icons.person_outline,
@@ -228,6 +230,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // Informations médicales
           _buildSection(
             title: 'Données Médicales',
+            delayMs: 150,
             children: [
               _buildInfoTile(
                 icon: Icons.medical_information_outlined,
@@ -301,6 +304,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           // Paramètres
           _buildSection(
             title: 'Paramètres',
+            delayMs: 200,
             children: [
               _buildMenuTile(
                 icon: Icons.lock_outline,
@@ -331,12 +335,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 subtitle: 'Français',
                 onTap: _showLanguageDialog,
               ),
+              _buildMenuTile(
+                icon: Icons.science_outlined,
+                title: 'Contribuer à la recherche',
+                subtitle: 'Partage anonymisé pour améliorer le modèle IA',
+                trailing: Switch(
+                  value: _currentUser?.allowResearchDataSharing ?? false,
+                  onChanged: _onToggleResearchConsent,
+                  activeColor: AppColors.primary,
+                ),
+              ),
             ],
           ),
 
           // À propos
           _buildSection(
             title: 'Support',
+            delayMs: 250,
             children: [
               _buildMenuTile(
                 icon: Icons.help_outline,
@@ -381,7 +396,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
             ),
-          ),
+          ).animate().fadeIn(delay: 300.ms, duration: 350.ms),
           const SizedBox(height: 20),
         ],
       ),
@@ -448,7 +463,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       )
                     : const Icon(Icons.person,
                         size: 50, color: AppColors.primary),
-              ),
+              ).animate().fadeIn(duration: 400.ms).scale(
+                  begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack, duration: 500.ms),
               Positioned(
                 bottom: 0,
                 right: 0,
@@ -534,6 +550,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildSection({
     required String title,
     required List<Widget> children,
+    int delayMs = 0,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,7 +576,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         const SizedBox(height: 20),
       ],
-    );
+    ).animate().fadeIn(delay: delayMs.ms, duration: 350.ms).slideY(begin: 0.06, end: 0);
   }
 
   Widget _buildInfoTile({
@@ -1146,6 +1163,88 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// 🔬 CONSENTEMENT PARTAGE DE DONNÉES POUR LA RECHERCHE
+  ///
+  /// Activation = opt-in explicite avec dialog détaillant précisément ce qui
+  /// est partagé (audio de toux pseudonymisé, pas les données nominatives).
+  /// Désactivation = immédiate, sans friction (droit de retrait RGPD).
+  Future<void> _onToggleResearchConsent(bool enabled) async {
+    if (_currentUser == null) return;
+
+    if (!enabled) {
+      final updatedUser = _currentUser!.copyWith(
+        allowResearchDataSharing: false,
+        updatedAt: DateTime.now(),
+      );
+      await _authService.updateUserProfile(updatedUser);
+      if (!mounted) return;
+      setState(() => _currentUser = updatedUser);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Partage pour la recherche désactivé')),
+      );
+      return;
+    }
+
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Contribuer à la recherche'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'RespiraBox utilise un modèle de reconnaissance de crépitements/'
+                'sibilants entraîné sur un dataset clinique public, pas encore '
+                'sur de vraies toux enregistrées au téléphone. Votre contribution '
+                'aide à corriger ça.',
+              ),
+              SizedBox(height: 12),
+              Text('Si vous acceptez, à chaque test de toux :',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 6),
+              Text('• Votre enregistrement audio et les résultats du test sont partagés'),
+              Text('• Votre nom, email et contact ne sont JAMAIS transmis avec'),
+              Text('• Un identifiant pseudonymisé (non réversible) remplace votre identité'),
+              Text(
+                '• ⚠️ Votre voix elle-même pourrait théoriquement permettre de vous '
+                'identifier, même sans donnée nominative associée',
+              ),
+              SizedBox(height: 12),
+              Text('Vous pouvez désactiver ce partage à tout moment ici.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Refuser'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('J\'accepte'),
+          ),
+        ],
+      ),
+    );
+
+    if (accepted != true) return;
+
+    final updatedUser = _currentUser!.copyWith(
+      allowResearchDataSharing: true,
+      researchConsentDate: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await _authService.updateUserProfile(updatedUser);
+    if (!mounted) return;
+    setState(() => _currentUser = updatedUser);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Merci de contribuer à la recherche 🙏')),
     );
   }
 

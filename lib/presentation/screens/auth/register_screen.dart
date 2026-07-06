@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
 import '../../../data/services/auth_service.dart';
+import '../../widgets/common/common.dart';
 
 // ── WIDGET CHECKBOX CONSENTEMENT ────────────────────────────────────────────
 class _ConsentCheckbox extends StatelessWidget {
@@ -206,7 +208,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -215,7 +216,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
+      body: AppBackground(
+        child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Form(
@@ -229,7 +231,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withOpacity(0.15),
+                          AppColors.secondary.withOpacity(0.15),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(40),
                     ),
                     child: const Icon(
@@ -238,14 +247,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       color: AppColors.primary,
                     ),
                   ),
-                ),
+                ).animate().fadeIn(duration: 400.ms).scale(
+                    begin: const Offset(0.7, 0.7), curve: Curves.easeOutBack, duration: 500.ms),
                 const SizedBox(height: 24),
                 Center(
                   child: Text(
                     'Créer un compte',
                     style: AppTextStyles.headline1,
                   ),
-                ),
+                ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
                 const SizedBox(height: 8),
                 Center(
                   child: Text(
@@ -255,7 +265,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                ),
+                ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
                 const SizedBox(height: 32),
 
                 // Prénom
@@ -593,28 +603,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ],
                     ),
-                  ),
+                  ).animate().shake(duration: 400.ms, hz: 4).fadeIn(duration: 200.ms),
 
                 // Bouton Créer un compte
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleRegister,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : Text(
-                            'Créer un compte',
-                            style: AppTextStyles.button
-                                .copyWith(color: Colors.white),
-                          ),
-                  ),
+                AppPrimaryButton(
+                  label: 'Créer un compte',
+                  isLoading: _isLoading,
+                  onPressed: _isLoading ? null : _handleRegister,
                 ),
                 const SizedBox(height: 24),
 
@@ -644,6 +639,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

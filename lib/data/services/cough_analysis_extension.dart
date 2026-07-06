@@ -1,4 +1,5 @@
 import 'audio_features_extractor.dart';
+import 'crackle_wheeze_ml_service.dart';
 
 /// 🧪 EXTENSION D'ANALYSE DE TOUX INTELLIGENTE AVANCÉE
 /// Détection TB/Pneumonie basée sur caractéristiques acoustiques réelles
@@ -66,21 +67,28 @@ class CoughAnalysisHelper {
         lowerText.contains('respiration') ||
         lowerText.contains('expectoration');
 
-    // 2️⃣ DÉTECTION PAR DURÉE: tout audio > 1.5s est analysable
-    final hasCoughByDuration = duration > 1.5;
+    // 2️⃣ DÉTECTION PAR DURÉE: audio >1.5s ET pas du silence pur (>1.5% RMS)
+    // — filtre le silence/bruit de fond quasi nul, sans exiger le seuil
+    // acoustique plus strict ci-dessous. Rattrape les toux dont l'énergie
+    // moyenne sur tout l'enregistrement est diluée par du silence avant/après.
+    final hasCoughByDuration = duration > 1.5 && energy > 0.015;
 
-    // 3️⃣ DÉTECTION ACOUSTIQUE: seuil bas pour capter toux même faibles
+    // 3️⃣ DÉTECTION ACOUSTIQUE: seuil 0.04 RMS (0.08 s'est révélé trop
+    // strict en usage réel — de vraies toux enregistrées au micro d'un
+    // smartphone étaient rejetées, cf. rapport "0 détection"). 0.05
+    // laissait passer un peu de bruit ambiant/souffle ; 0.04 est un
+    // compromis pour ne plus bloquer de vraies toux.
     bool hasCoughByAcoustics = false;
     if (audioFeatures != null) {
-      final energy = audioFeatures['energy'] ?? 0.0;
+      final audioEnergy = audioFeatures['energy'] ?? 0.0;
       final peaks = audioFeatures['energyPeaks'] as List? ?? [];
-      // Seuil 0.05 = 5% RMS (couvre toux faibles à distance normale)
-      hasCoughByAcoustics = energy > 0.05 || peaks.isNotEmpty;
+      hasCoughByAcoustics = audioEnergy > 0.04 || peaks.isNotEmpty;
     }
 
-    // ✅ TOUX DÉTECTÉE SI durée OU acoustique suffisante (mots-clés optionnels)
+    // ✅ TOUX DÉTECTÉE SI signal acoustique réel, mots-clés explicites, OU
+    // durée suffisante avec un minimum de signal (pas du silence pur).
     final hasCough =
-        hasCoughKeywords || hasCoughByDuration || hasCoughByAcoustics;
+        hasCoughByAcoustics || hasCoughKeywords || hasCoughByDuration;
 
     print('🔍 Détection toux (analyse acoustique):');
     print(
@@ -225,10 +233,12 @@ class CoughAnalysisHelper {
     if (isImmunocompromised) tbRisk += 25; // VIH/immunodépression = risque TB multiplié ×7
     if (patientAge != null && patientAge >= 15 && patientAge <= 45) tbRisk += 8;
 
-    // F. Acoustique TB (toux sèche persistante, fréquence 200-400 Hz)
+    // F. Acoustique TB (fréquence 200-400 Hz)
+    // Note: "toux sèche + durée >=14j" est déjà compté au critère 1
+    // (+30), on ne le recompte pas ici pour éviter un double comptage
+    // du même signal clinique.
     if (audioFeatures != null) {
       if (frequency >= 200 && frequency <= 400) tbRisk += 10;
-      if (coughType == 'sèche' && symptomDurationDays >= 14) tbRisk += 10;
     }
 
     // ================================================================
@@ -272,7 +282,16 @@ class CoughAnalysisHelper {
       final lowFreqRatio = spectralFeatures['lowBand'] ?? 0.0;
       if (lowFreqRatio > 0.5) pneumoniaRisk += 15; // Mucus/liquide pulmonaire
       if (zcr < 0.1) pneumoniaRisk += 10; // Signal humide
-      if (audioFeatures['crackles'] == true) pneumoniaRisk += 20; // Crépitements
+
+      // Crépitements : probabilité ML continue (modèle entraîné sur ICBHI
+      // 2017, AUC=0.70) si disponible, sinon repli sur l'heuristique
+      // énergie haute-fréquence >15% (moins fiable, non validée).
+      final crackleProbML = audioFeatures['crackleProbabilityML'] as double?;
+      if (crackleProbML != null) {
+        pneumoniaRisk += (crackleProbML * 20).round();
+      } else if (audioFeatures['crackles'] == true) {
+        pneumoniaRisk += 20;
+      }
     }
 
     // E. Comorbidités
@@ -355,9 +374,15 @@ class CoughAnalysisHelper {
         (patientContext != null ? 40 : 0) +
         (symptomDurationDays > 0 ? 20 : 0);
 
+    // Fiabilité de l'analyse : fausse si les features audio viennent du
+    // fallback (audio illisible/vide) plutôt que d'un vrai enregistrement.
+    final bool isReliable = audioFeatures == null ||
+        audioFeatures['isReliable'] != false;
+
     return {
       // Détection toux - AMÉLIORÉE (ne dépend plus uniquement de la transcription)
       'hasCough': hasCough,
+      'isReliable': isReliable,
 
       // Classification
       'type': coughType,
@@ -374,6 +399,8 @@ class CoughAnalysisHelper {
         'spectralCentroid': spectralFeatures['centroid'] ?? 0.0,
         'spectralRolloff': spectralFeatures['rolloff'] ?? 0.0,
         'mfccCount': mfcc.length,
+        'crackleProbabilityML': audioFeatures?['crackleProbabilityML'],
+        'wheezeProbabilityML': audioFeatures?['wheezeProbabilityML'],
       },
 
       // Scores risque maladie (0-100)
@@ -519,6 +546,25 @@ class CoughAnalysisHelper {
       final features =
           await AudioFeaturesExtractor.extractFeatures(audioFilePath);
 
+      // 🤖 Détecteur ML crackles/sibilants (entraîné sur ICBHI 2017,
+      // voir ml/README.md) — optionnel, dégrade gracieusement vers
+      // l'heuristique acoustique existante si le modèle est indisponible.
+      try {
+        final samples = await AudioFeaturesExtractor.loadPcmSamples(audioFilePath);
+        final mlResult = await CrackleWheezeMLService.predict(
+          samples,
+          inputSampleRate: AudioFeaturesExtractor.sampleRate,
+        );
+        if (mlResult != null) {
+          features['crackleProbabilityML'] = mlResult['crackleProbability'];
+          features['wheezeProbabilityML'] = mlResult['wheezeProbability'];
+          print(
+              '🤖 ML crackles=${(mlResult['crackleProbability']! * 100).toStringAsFixed(0)}% wheezes=${(mlResult['wheezeProbability']! * 100).toStringAsFixed(0)}%');
+        }
+      } catch (e) {
+        print('⚠️ ML crackle/wheeze indisponible, fallback heuristique: $e');
+      }
+
       print('✅ Features extraites avec succès');
       print('   📊 Fréquence: ${features['frequency'].toStringAsFixed(1)} Hz');
       print(
@@ -532,7 +578,8 @@ class CoughAnalysisHelper {
     } catch (e) {
       print('⚠️ Erreur extraction audio, fallback données par défaut: $e');
 
-      // FALLBACK: données par défaut en cas d'erreur
+      // FALLBACK: données par défaut en cas d'erreur — isReliable=false pour
+      // que les appelants n'affichent pas un score TB/pneumonie comme fiable
       return {
         'frequency': 300.0,
         'amplitude': 0.5,
@@ -546,8 +593,9 @@ class CoughAnalysisHelper {
           'rolloff': 2500.0,
         },
         'mfcc': List.generate(13, (_) => 0.0),
-        'energyPeaks': [1.0, 3.5, 6.2],
+        'energyPeaks': const <double>[],
         'crackles': false,
+        'isReliable': false,
       };
     }
   }

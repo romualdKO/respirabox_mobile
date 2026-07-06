@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/constants/text_styles.dart';
 import '../../../routes/app_routes.dart';
 import '../../../data/services/auth_service.dart';
+import '../../widgets/common/common.dart';
 
 /// 🔐 ÉCRAN DE CONNEXION
 /// Permet à l'utilisateur de se connecter avec email/password ou Google
@@ -69,8 +71,8 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundLight,
-      body: SafeArea(
+      body: AppBackground(
+        child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Form(
@@ -85,7 +87,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 100,
                     height: 100,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withOpacity(0.15),
+                          AppColors.secondary.withOpacity(0.15),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                       borderRadius: BorderRadius.circular(50),
                     ),
                     child: const Icon(
@@ -94,7 +103,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: AppColors.primary,
                     ),
                   ),
-                ),
+                ).animate().fadeIn(duration: 400.ms).scale(
+                    begin: const Offset(0.7, 0.7), curve: Curves.easeOutBack, duration: 500.ms),
                 const SizedBox(height: 32),
                 // Titre
                 Center(
@@ -104,14 +114,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                ),
+                ).animate().fadeIn(delay: 150.ms, duration: 400.ms),
                 const SizedBox(height: 8),
                 Center(
                   child: Text(
                     'Bienvenue',
                     style: AppTextStyles.headline1,
                   ),
-                ),
+                ).animate().fadeIn(delay: 200.ms, duration: 400.ms),
                 const SizedBox(height: 48),
                 // Email
                 Text(
@@ -203,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                  ),
+                  ).animate().shake(duration: 400.ms, hz: 4).fadeIn(duration: 200.ms),
                 const SizedBox(height: 16),
                 // Forgot Password
                 Align(
@@ -223,22 +233,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 32),
                 // Login Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleLogin,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text('Se connecter'),
-                  ),
+                AppPrimaryButton(
+                  label: 'Se connecter',
+                  isLoading: _isLoading,
+                  onPressed: _isLoading ? null : _handleLogin,
                 ),
                 const SizedBox(height: 32),
                 // Divider
@@ -304,6 +302,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

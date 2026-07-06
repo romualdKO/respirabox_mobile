@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'core/config/firebase_config.dart';
 import 'core/config/theme_config.dart';
 import 'data/services/notification_service.dart';
@@ -23,6 +24,9 @@ void main() async {
 
   // Initialisation FCM (notifications push)
   await NotificationService().initFCM();
+
+  // 🌍 Données de date localisées (français) — requis pour DateFormat('fr_FR')
+  await initializeDateFormatting('fr_FR', null);
 
   // 📱 Configuration de l'orientation (portrait uniquement)
   await SystemChrome.setPreferredOrientations([

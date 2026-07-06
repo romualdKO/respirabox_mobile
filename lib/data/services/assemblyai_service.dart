@@ -279,7 +279,8 @@ class AssemblyAIService {
     );
 
     // ÉTAPE 4 : Fusion ML Gemini + scoring clinique
-    // Si Gemini ML disponible : moyenne pondérée (60% ML, 40% clinique)
+    // Si Gemini ML disponible : pondération dynamique selon mlConfidence
+    // (avant: 60/40 fixe, qui ignorait la confiance réelle du modèle ML)
     // Si Gemini indisponible : scoring clinique seul
     int finalTbRisk;
     int finalPneumoniaRisk;
@@ -294,15 +295,21 @@ class AssemblyAIService {
       final mlHasCough = geminiML['hasCough'] as bool? ?? true;
       mlConfidence = (geminiML['mlConfidence'] as num?)?.toDouble() ?? 0.8;
 
-      // Pondération : ML Gemini 60% + clinique 40%
-      finalTbRisk = ((mlTb * 0.6) + (coughAnalysis['tbRisk'] * 0.4)).round().clamp(0, 100);
-      finalPneumoniaRisk = ((mlPneumonia * 0.6) + (coughAnalysis['pneumoniaRisk'] * 0.4)).round().clamp(0, 100);
+      // Poids ML proportionnel à sa confiance, borné à [30%, 80%] pour que
+      // le scoring clinique garde toujours un poids significatif même quand
+      // Gemini est très confiant, et inversement ML garde un poids minimal
+      // quand sa confiance est faible plutôt que d'être ignoré à 0%.
+      final mlWeight = (0.3 + mlConfidence * 0.5).clamp(0.3, 0.8);
+      final clinicalWeight = 1 - mlWeight;
+
+      finalTbRisk = ((mlTb * mlWeight) + (coughAnalysis['tbRisk'] * clinicalWeight)).round().clamp(0, 100);
+      finalPneumoniaRisk = ((mlPneumonia * mlWeight) + (coughAnalysis['pneumoniaRisk'] * clinicalWeight)).round().clamp(0, 100);
       // hasCough : OR entre ML et acoustique (si l'un des deux le détecte → vrai)
       finalHasCough = mlHasCough || (coughAnalysis['hasCough'] as bool? ?? false);
       finalCoughType = geminiML['coughType'] as String? ?? coughAnalysis['type'] as String;
       finalIntensity = geminiML['intensity'] as String? ?? coughAnalysis['intensity'] as String;
 
-      print('🩺 FUSION ML+Clinique: hasCough=$finalHasCough  TB=$finalTbRisk%  Pneumonie=$finalPneumoniaRisk%  (ML confiance=${(mlConfidence*100).toInt()}%)');
+      print('🩺 FUSION ML+Clinique: hasCough=$finalHasCough  TB=$finalTbRisk%  Pneumonie=$finalPneumoniaRisk%  (poids ML=${(mlWeight*100).toInt()}% confiance=${(mlConfidence*100).toInt()}%)');
     } else {
       finalTbRisk = coughAnalysis['tbRisk'] as int;
       finalPneumoniaRisk = coughAnalysis['pneumoniaRisk'] as int;
@@ -312,9 +319,15 @@ class AssemblyAIService {
       print('🩺 Scoring clinique seul: hasCough=$finalHasCough  TB=$finalTbRisk%  Pneumonie=$finalPneumoniaRisk%');
     }
 
+    // Fiabilité: fausse si l'audio local était illisible/vide ET que Gemini
+    // ML n'a pas pu compenser avec sa propre analyse.
+    final bool isReliable =
+        (coughAnalysis['isReliable'] as bool? ?? true) || hasGeminiML;
+
     return {
       'status': 'completed',
       'hasCough': finalHasCough,
+      'isReliable': isReliable,
       'text': transcribedText.isEmpty ? '[Analyse acoustique]' : transcribedText,
       'confidence': confidence,
       'duration': bestDuration,

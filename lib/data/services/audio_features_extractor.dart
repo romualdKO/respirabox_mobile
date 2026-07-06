@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
 import 'package:fftea/fftea.dart';
 import 'package:scidart/numdart.dart';
@@ -118,12 +117,20 @@ class AudioFeaturesExtractor {
         'duration': audioData.length / sampleRate,
         'sampleRate': sampleRate,
         'samplesCount': audioData.length,
+        'isReliable': true,
       };
     } catch (e) {
       print('❌ Erreur extraction features: $e');
       return _getDefaultFeatures();
     }
   }
+
+  /// 📂 CHARGER FICHIER AUDIO WAV → samples PCM normalisés [-1,1]
+  ///
+  /// Exposé publiquement pour être réutilisé par CrackleWheezeMLService
+  /// (évite de dupliquer le parsing WAV).
+  static Future<List<double>> loadPcmSamples(String filePath) =>
+      _loadAudioFile(filePath);
 
   /// 📂 CHARGER FICHIER AUDIO WAV → samples PCM 16-bit
   ///
@@ -162,42 +169,19 @@ class AudioFeaturesExtractor {
       }
 
       print('📂 ${samples.length} samples PCM extraits');
-      return samples.length > 100 ? samples : _generateSyntheticCough();
-    } catch (e) {
-      print('⚠️ Erreur lecture audio, génération signal synthétique: $e');
-      return _generateSyntheticCough();
-    }
-  }
-
-  /// 🔊 GÉNÉRER SIGNAL SYNTHÉTIQUE POUR TESTS
-  ///
-  /// Simule une toux avec fréquence ~300 Hz
-  static List<double> _generateSyntheticCough() {
-    final duration = 2.0; // 2 secondes
-    final samples = (sampleRate * duration).toInt();
-    final signal = <double>[];
-
-    final frequency = 280.0 + Random().nextDouble() * 80; // 280-360 Hz
-    final omega = 2 * pi * frequency / sampleRate;
-
-    for (int i = 0; i < samples; i++) {
-      // Enveloppe d'amplitude (attack-decay)
-      double envelope = 1.0;
-      if (i < samples * 0.1) {
-        envelope = i / (samples * 0.1); // Attack
-      } else if (i > samples * 0.7) {
-        envelope = 1.0 - (i - samples * 0.7) / (samples * 0.3); // Decay
+      // Un fichier avec trop peu de samples n'est pas exploitable : on ne
+      // fabrique plus de signal factice (ça produisait un faux diagnostic
+      // silencieux). On retourne vide pour déclencher le fallback marqué
+      // "non fiable" dans extractFeatures().
+      if (samples.length <= 100) {
+        print('⚠️ Trop peu de samples PCM (${samples.length}), audio jugé non exploitable');
+        return [];
       }
-
-      // Signal sinusoïdal avec bruit
-      final tone = sin(omega * i);
-      final noise = (Random().nextDouble() - 0.5) * 0.1;
-
-      signal.add(envelope * (0.7 * tone + 0.3 * noise));
+      return samples;
+    } catch (e) {
+      print('⚠️ Erreur lecture audio: $e');
+      return [];
     }
-
-    print('🎵 Signal synthétique généré: ${frequency.toStringAsFixed(1)} Hz');
-    return signal;
   }
 
   /// 📊 CALCUL AMPLITUDE MOYENNE
@@ -484,7 +468,10 @@ class AudioFeaturesExtractor {
   /// Trouve les pics d'énergie dans le signal (chaque pic = une toux)
   static List<double> _detectEnergyPeaks(List<double> samples) {
     const int windowSize = sampleRate ~/ 10; // Fenêtre 100ms
-    const double threshold = 0.05; // Seuil bas: 5% RMS (couvre toux faibles)
+    // Seuil 4% RMS. 0.08 s'est révélé trop strict en usage réel (vraies
+    // toux rejetées, cf. rapport "0 détection") ; 0.04 reste plus prudent
+    // que l'original 0.05 tout en ne bloquant plus les toux légitimes.
+    const double threshold = 0.04;
 
     final peaks = <double>[];
 
@@ -539,6 +526,11 @@ class AudioFeaturesExtractor {
   }
 
   /// 🔧 FEATURES PAR DÉFAUT (fallback)
+  ///
+  /// ⚠️ Utilisé uniquement quand l'audio est illisible/vide. `isReliable:
+  /// false` doit être vérifié par les appelants pour éviter d'afficher un
+  /// score TB/pneumonie basé sur ces valeurs comme s'il s'agissait d'une
+  /// vraie analyse.
   static Map<String, dynamic> _getDefaultFeatures() {
     return {
       'frequency': 250.0,
@@ -553,11 +545,12 @@ class AudioFeaturesExtractor {
         'highBand': 0.1,
       },
       'mfcc': List.filled(13, 0.0),
-      'energyPeaks': [0.5, 1.5, 2.5],
+      'energyPeaks': const <double>[],
       'crackles': false,
-      'duration': 2.0,
+      'duration': 0.0,
       'sampleRate': sampleRate,
-      'samplesCount': sampleRate * 2,
+      'samplesCount': 0,
+      'isReliable': false,
     };
   }
 }

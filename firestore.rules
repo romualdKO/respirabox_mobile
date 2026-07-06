@@ -56,5 +56,45 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // 🔬 Dataset de recherche pseudonymisé (opt-in, voir research_data_service.dart)
+    // Écriture seule côté client — aucune lecture/modif/suppression pour
+    // éviter qu'un utilisateur authentifié puisse consulter les contributions
+    // d'un autre. Accès en lecture réservé à l'équipe recherche (console/admin SDK).
+    match /research_cough_dataset/{docId} {
+      allow create: if isAuthenticated();
+      allow read, update, delete: if false;
+    }
+
+    // 📰 Flux éducatif santé respiratoire (OMS Afrique)
+    // ⚠️ Pas de Cloud Function déployée (plan Blaze non activé) — la
+    // synchronisation se fait depuis l'app (EducationSyncService), donc le
+    // client a besoin d'écrire le contenu. Garde-fou : sourceUrl doit
+    // pointer vers afro.who.int, ce qui limite (sans l'éliminer) le risque
+    // d'injection de faux contenu par un client modifié. Si le plan Blaze
+    // est activé un jour, migrer vers functions/index.js (déjà écrite,
+    // voir functions/README.md) et durcir cette règle en lecture seule.
+    function isOfficialSource() {
+      return request.resource.data.sourceUrl.matches('https://www[.]afro[.]who[.]int/.*');
+    }
+
+    match /education_posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOfficialSource();
+      allow update: if isAuthenticated() && (
+                       (isOfficialSource() &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['title','summary','imageUrl','sourceUrl','sourceName','publishedAt','category','reactionCounts']))
+                       ||
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactionCounts'])
+                     );
+      allow delete: if false;
+
+      // Réaction emoji d'un utilisateur : lisible/modifiable uniquement par lui-même
+      match /reactions/{userId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
+    }
   }
 }
